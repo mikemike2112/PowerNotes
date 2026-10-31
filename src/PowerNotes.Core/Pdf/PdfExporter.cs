@@ -1,0 +1,86 @@
+using PdfSharp.Drawing;
+using PdfSharp.Fonts;
+using PdfSharp.Pdf;
+using PowerNotes.Core.Fonts;
+using PowerNotes.Core.Layout;
+
+namespace PowerNotes.Core.Pdf;
+
+/// <summary>Risolve i font di PDFsharp con lo stesso catalogo usato dal layout (stessi file, stesse metriche).</summary>
+sealed class CatalogFontResolver : IFontResolver
+{
+    public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic)
+    {
+        var e = FontCatalog.Resolve(familyName, isBold, isItalic);
+        if (e == null) return null;
+        // ponytail: le collezioni .ttc non si incorporano (PDFsharp vuole un font singolo) → ripiego su Arial
+        if (e.File.EndsWith(".ttc", StringComparison.OrdinalIgnoreCase)) e = FontCatalog.Resolve("Arial", isBold, isItalic);
+        return e == null ? null : new FontResolverInfo(e.File);
+    }
+
+    public byte[]? GetFont(string faceName) => File.ReadAllBytes(faceName);
+}
+
+/// <summary>Esporta il risultato del layout in PDF: stessa pipeline dello schermo, testo vettoriale con font incorporati.</summary>
+public static class PdfExporter
+{
+    static bool _init;
+
+    static void Init()
+    {
+        if (_init) return;
+        GlobalFontSettings.FontResolver = new CatalogFontResolver();
+        _init = true;
+    }
+
+    static XColor Col(string? hex)
+    {
+        if (hex is { Length: 6 } && int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var v))
+            return XColor.FromArgb((v >> 16) & 255, (v >> 8) & 255, v & 255);
+        return XColors.Black;
+    }
+
+    public static byte[] Export(LayoutResult layout, string title = "")
+    {
+        Init();
+        using var pdf = new PdfDocument();
+        pdf.Info.Title = title;
+        pdf.Info.Creator = "PowerNotes";
+        foreach (var pg in layout.Pages)
+        {
+            var page = pdf.AddPage();
+            page.Width = XUnit.FromPoint(pg.Width); page.Height = XUnit.FromPoint(pg.Height);
+            using var g = XGraphics.FromPdfPage(page);
+            foreach (var prim in pg.Prims)
+                switch (prim)
+                {
+                    case RectPrim r: g.DrawRectangle(new XSolidBrush(Col(r.Fill)), r.X, r.Y, r.W, r.H); break;
+                    case LinePrim l: g.DrawLine(new XPen(Col(l.Color), l.Width), l.X1, l.Y1, l.X2, l.Y2); break;
+                    case TextPrim t:
+                        {
+                            var style = (t.Fmt.Bold ? XFontStyleEx.Bold : XFontStyleEx.Regular) | (t.Fmt.Italic ? XFontStyleEx.Italic : XFontStyleEx.Regular);
+                            var font = new XFont(t.Fmt.Font, t.Fmt.EffSize, style, new XPdfFontOptions(PdfFontEncoding.Unicode));
+                            g.DrawString(t.Text, font, new XSolidBrush(Col(t.Fmt.Color)), new XPoint(t.X, t.Baseline), XStringFormats.BaseLineLeft);
+                            break;
+                        }
+                    case ImagePrim im when im.Part != null:
+                        try
+                        {
+                            var bytes = new MemoryStream();
+                            using (var s = im.Part.GetStream()) s.CopyTo(bytes);
+                            bytes.Position = 0;
+                            using var img = XImage.FromStream(bytes);
+                            g.DrawImage(img, im.X, im.Y, im.W, im.H);
+                        }
+                        catch (Exception e) when (e is IOException or InvalidOperationException or ArgumentException or NotImplementedException or NotSupportedException)
+                        {
+                            g.DrawRectangle(XPens.Gray, im.X, im.Y, im.W, im.H);   // immagine illeggibile: segnaposto
+                        }
+                        break;
+                }
+        }
+        using var ms = new MemoryStream();
+        pdf.Save(ms);
+        return ms.ToArray();
+    }
+}

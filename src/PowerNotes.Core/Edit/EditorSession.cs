@@ -555,6 +555,26 @@ public sealed class EditorSession
 
     public bool InTable => CellOf(Caret.P) != null;
 
+    /// <summary>Caret all'inizio di un elemento di elenco (Tab lì cambia livello).</summary>
+    public bool AtListStart => !HasSelection && Caret.Off == 0 && Styles.ResolvePara(Caret.P, null, out _).NumId is > 0;
+
+    /// <summary>Tab in tabella: cella successiva (o precedente); nell'ultima cella aggiunge una riga. False se non si è in tabella.</summary>
+    public bool TabInTable(bool back)
+    {
+        var c = CellOf(Caret.P); if (c == null) return false;
+        var cells = c.Value.tbl.Elements<TableRow>().SelectMany(r => r.Elements<TableCell>()).ToList();
+        int i = cells.IndexOf(c.Value.cell) + (back ? -1 : 1);
+        if (i < 0) return true;
+        if (i >= cells.Count)
+        {
+            AddRowBelow();
+            cells = c.Value.tbl.Elements<TableRow>().SelectMany(r => r.Elements<TableCell>()).ToList();
+        }
+        var p = cells[Math.Min(i, cells.Count - 1)].Descendants<Paragraph>().First();
+        Set(new Pos(p, 0));
+        return true;
+    }
+
     /// <summary>Unisce le celle comprese nella selezione (rettangolo in coordinate di griglia).</summary>
     public bool MergeCells()
     {
