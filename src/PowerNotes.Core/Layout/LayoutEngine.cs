@@ -14,10 +14,10 @@ public sealed class LayoutEngine
 {
     // ---- strutture intermedie ----
     abstract class Block { public double Height; }
-    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public double TabPos; }
+    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public double TabPos; }
     sealed class SegL { public Atom A = null!; public double X; public double W; }
-    sealed class LineL { public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
-    sealed class ParaL : Block { public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
+    sealed class LineL { public double NatH; public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
+    sealed class ParaL : Block { public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
     sealed class CellL { public double X, W, ContentH, H; public int RowSpan = 1, Col, Span; public List<Block> Content = new(); public string? Fill; public Bdr?[] B = new Bdr?[4]; public bool Continue; public string VAlign = "top"; public double MarT, MarB; }
     sealed class RowL { public double H; public List<CellL> Cells = new(); public bool Exact; }
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
@@ -37,6 +37,8 @@ public sealed class LayoutEngine
         public SectionProperties? Pr;
         public double W = 612, H = 792, Top = 72, Bottom = 72, Left = 72, Right = 72, Header = 36, Footer = 36, Gutter;
         public bool TitlePg, Continuous;
+        public int Cols = 1; public double ColGap = 36;
+        public double ColW => Cols > 1 ? (ContentW - ColGap * (Cols - 1)) / Cols : ContentW;
         public OpenXmlPart? HdrDefault, HdrFirst, FtrDefault, FtrFirst;
         public double ContentW => W - Left - Right - Gutter;
     }
@@ -48,6 +50,8 @@ public sealed class LayoutEngine
     Ctx _body = null!;
     // stato di paginazione
     Page _pg = null!;
+    double _lastLineY, _colShift;
+    int _col;
     double _y, _bottom, _top, _left, _width;
     bool _pageHasBody, _hardTop;
     SectInfo _sec = null!;
@@ -97,7 +101,7 @@ public sealed class LayoutEngine
             _sec = si;
             bool contiguous = !first && si.Continuous;
             if (!contiguous) NewPage(first ? false : true, hard: true, first: true);
-            else { _left = si.Left + si.Gutter; _width = si.ContentW; }
+            else { _left = si.Left + si.Gutter; _width = si.ColW; _col = 0; _colShift = 0; }
             first = false;
             var built = new List<Block>();
             foreach (var b in blocks)
@@ -135,6 +139,7 @@ public sealed class LayoutEngine
             s.Header = (m.Header?.Value ?? 720) / 20.0; s.Footer = (m.Footer?.Value ?? 720) / 20.0; s.Gutter = (m.Gutter?.Value ?? 0) / 20.0;
         }
         s.TitlePg = pr.GetFirstChild<TitlePage>() is { } tp && (tp.Val?.Value ?? true);
+        if (pr.GetFirstChild<Columns>() is { } cols) { s.Cols = Math.Clamp((int)(cols.ColumnCount?.Value ?? 1), 1, 12); s.ColGap = (double.TryParse(cols.Space?.Value, out var csp) ? csp : 720) / 20.0; }
         s.Continuous = pr.GetFirstChild<SectionType>()?.Val?.Value == SectionMarkValues.Continuous;
         var main = _doc.MainDocumentPart!;
         foreach (var hr in pr.Elements<HeaderReference>())
@@ -194,6 +199,12 @@ public sealed class LayoutEngine
 
     void NewPage(bool addPage, bool hard, bool first)
     {
+        if (!first && !hard && _sec.Cols > 1 && _col < _sec.Cols - 1)
+        {
+            _col++; _colShift = _col * (_sec.ColW + _sec.ColGap); _y = _top; _pageHasBody = false; _hardTop = false;   // colonna successiva sulla stessa pagina
+            return;
+        }
+        _col = 0; _colShift = 0;
         _secPageIdx = first ? 0 : _secPageIdx + 1;
         _pg = new Page { Index = _res.Pages.Count, Number = _res.Pages.Count + 1, Width = _sec.W, Height = _sec.H };
         _res.Pages.Add(_pg);
@@ -202,18 +213,18 @@ public sealed class LayoutEngine
         double ftrH = StackHeight(BuildHF(FtrFor(_sec, _secPageIdx), _sec, 1, 1));
         _top = Math.Max(_sec.Top, hdrH > 0 ? _sec.Header + hdrH : 0);
         _bottom = Math.Min(_sec.H - _sec.Bottom, ftrH > 0 ? _sec.H - _sec.Footer - ftrH : double.MaxValue);
-        _left = _sec.Left + _sec.Gutter; _width = _sec.ContentW;
+        _left = _sec.Left + _sec.Gutter; _width = _sec.ColW;
         _y = _top; _pageHasBody = false; _hardTop = hard;
     }
 
     void DrawHeaderFooter(Page pg, SectInfo s, int idx, int total)
     {
-        var save = _pg; _pg = pg;
+        var save = _pg; _pg = pg; var saveShift = _colShift; _colShift = 0;
         var hb = BuildHF(HdrFor(s, idx), s, pg.Number, total);
         EmitStack(hb, s.Header);
         var fb = BuildHF(FtrFor(s, idx), s, pg.Number, total);
         EmitStack(fb, s.H - s.Footer - StackHeight(fb));
-        _pg = save;
+        _pg = save; _colShift = saveShift;
     }
 
     void EmitStack(List<Block> bs, double y)
@@ -332,10 +343,10 @@ public sealed class LayoutEngine
         {
             var l = p.Lines[li];
             double baseY = y + l.Base;
-            var lb = new LineBox { Para = p.P, PageIndex = _pg.Index, Start = l.Start, End = l.End, Y = y, Height = l.H, Baseline = baseY, Left = p.X + l.Left, Right = p.X + l.Right, LastOfPara = l.Last };
+            var lb = new LineBox { Para = p.P, PageIndex = _pg.Index, Start = l.Start, End = l.End, Y = p.Collapsed ? _lastLineY : y, Height = p.Collapsed ? l.NatH : l.H, Baseline = baseY, Left = p.X + _colShift + l.Left, Right = p.X + _colShift + l.Right, LastOfPara = l.Last };
             foreach (var s in l.Segs)
             {
-                var a = s.A; double x = p.X + s.X;
+                var a = s.A; double x = p.X + _colShift + s.X;
                 var f = a.Fmt;
                 double sh = f.VertAlign > 0 ? -f.Size * 0.35 : f.VertAlign < 0 ? f.Size * 0.14 : 0;
                 lb.Segs.Add(new SegBox { Start = a.Start, Length = a.Len, X = x, Width = s.W, Text = a.Text, Fmt = f, Kind = a.K switch { 't' => LeafKind.Tab, 'b' => LeafKind.Break, 'p' => LeafKind.PageBreak, 'i' => LeafKind.Image, _ => LeafKind.Text }, Synthetic = a.Synth });
@@ -357,6 +368,7 @@ public sealed class LayoutEngine
                     if (f.Strike) _pg.Prims.Add(new LinePrim { X1 = x, X2 = x + s.W, Y1 = baseY + sh - f.EffSize * 0.27, Y2 = baseY + sh - f.EffSize * 0.27, Width = Math.Max(0.5, f.EffSize / 18), Color = f.Color ?? "000000" });
                 }
             }
+            if (!p.Collapsed) _lastLineY = y;
             _pg.Lines.Add(lb); _res.Register(lb);
             y += l.H;
         }
@@ -384,10 +396,10 @@ public sealed class LayoutEngine
                 if (c.Continue) continue;
                 int endRow = Math.Min(r + c.RowSpan, r1);
                 double cy = rowY[r], ch = rowY[endRow] - cy;
-                if (c.Fill != null) _pg.Prims.Add(new RectPrim { X = c.X, Y = cy, W = c.W, H = ch, Fill = c.Fill });
+                if (c.Fill != null) _pg.Prims.Add(new RectPrim { X = c.X + _colShift, Y = cy, W = c.W, H = ch, Fill = c.Fill });
                 double off = c.VAlign == "center" ? Math.Max(0, (ch - c.MarT - c.MarB - c.ContentH) / 2) : c.VAlign == "bottom" ? Math.Max(0, ch - c.MarB - c.MarT - c.ContentH) : 0;
                 EmitBlocks(c.Content, cy + c.MarT + off);
-                void Edge(Bdr? b, double x1, double y1, double x2, double y2) { if (b != null) _pg.Prims.Add(new LinePrim { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Width = b.W, Color = b.Color }); }
+                void Edge(Bdr? b, double x1, double y1, double x2, double y2) { if (b != null) _pg.Prims.Add(new LinePrim { X1 = x1 + _colShift, Y1 = y1, X2 = x2 + _colShift, Y2 = y2, Width = b.W, Color = b.Color }); }
                 Edge(c.B[0], c.X, cy, c.X + c.W, cy);
                 Edge(c.B[2], c.X, cy + ch, c.X + c.W, cy + ch);
                 Edge(c.B[1], c.X, cy, c.X, cy + ch);
@@ -456,7 +468,7 @@ public sealed class LayoutEngine
             var lf = mark.Clone(); lvl.ApplyRun?.Invoke(lf);
             string lab = NumberLabel(c, F.NumId.Value, F.Ilvl ?? 0, lvl);
             if (lvl.Fmt == "bullet" && lab == "•" || lvl.Font.Equals("Symbol", StringComparison.OrdinalIgnoreCase) || lvl.Font.Equals("Wingdings", StringComparison.OrdinalIgnoreCase)) lf.Font = mark.Font;
-            atoms.Add(new Atom { K = 'w', Text = lab, Fmt = lf, W = Metrics.Width(lab, lf), Synth = true });
+            atoms.Add(new Atom { K = 'w', Text = lab, Fmt = lf, W = Metrics.Width(lab, lf), Synth = true, MetricFont = lvl.Font.Length > 0 && lvl.Fmt == "bullet" ? lvl.Font : null });
             if (lvl.Suff == "tab") atoms.Add(new Atom { K = 't', Text = "\t", Fmt = lf, Synth = true });
             else if (lvl.Suff == "space") atoms.Add(new Atom { K = 's', Text = " ", Fmt = lf, W = Metrics.Width(" ", lf), Synth = true, Spaces = 1 });
         }
@@ -498,6 +510,9 @@ public sealed class LayoutEngine
             }
         }
         BuildLines(para, atoms, mark, indL, indR, first, c);
+        // paragrafo che contiene solo un'interruzione di sezione (pagina successiva): Word non gli dedica una riga
+        if (atoms.Count == 0 && p.ParagraphProperties?.SectionProperties is { } sp0 && sp0.GetFirstChild<SectionType>()?.Val?.Value != SectionMarkValues.Continuous)
+        { para.Collapsed = true; para.Before = para.After = 0; foreach (var ln in para.Lines) ln.H = 0; }
         para.Height = para.Before + para.Lines.Sum(l => l.H) + para.After;
         return para;
     }
@@ -563,7 +578,7 @@ public sealed class LayoutEngine
         void Metr(RunFmt f, Atom? a = null)
         {
             if (a is { K: 'i' }) { maxAsc = Math.Max(maxAsc, a.ImgH); return; }
-            var ff = FontCatalog.Get(f.Font, f.Bold, f.Italic);
+            var ff = FontCatalog.Get(a?.MetricFont ?? f.Font, f.Bold, f.Italic);
             maxAsc = Math.Max(maxAsc, (ff.Ascent + ff.LineGap) * f.EffSize);
             maxDesc = Math.Max(maxDesc, ff.Descent * f.EffSize);
         }
@@ -576,7 +591,7 @@ public sealed class LayoutEngine
             if (F.LineRule == "exact") { h = F.Line / 20.0; bl = h * maxAsc / nat; }
             else if (F.LineRule == "atLeast") { h = Math.Max(nat, F.Line / 20.0); bl = maxAsc + (h - nat); }
             else if (F.Line != 240) { h = nat * F.Line / 240.0; bl = maxAsc + (h - nat); }
-            cur.H = h; cur.Base = bl; cur.Last = last;
+            cur.H = h; cur.NatH = h; cur.Base = bl; cur.Last = last;
             // larghezza utilizzata senza spazi finali
             int endIdx = cur.Segs.Count;
             while (endIdx > 0 && cur.Segs[endIdx - 1].A.K == 's') endIdx--;

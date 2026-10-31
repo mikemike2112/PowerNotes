@@ -8,14 +8,14 @@ public static class BuiltIns
 {
     const string W = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"";
 
-    public record StyleInfo(string Id, string Name);
+    public record StyleInfo(string Id, string Name, string WordName);
 
     /// <summary>Stili proposti dalla galleria (id, nome visibile).</summary>
     public static readonly StyleInfo[] Gallery =
     [
-        new("Normal", "Normale"), new("Title", "Titolo"), new("Subtitle", "Sottotitolo"),
-        new("Heading1", "Titolo 1"), new("Heading2", "Titolo 2"), new("Heading3", "Titolo 3"),
-        new("Quote", "Citazione"), new("ListParagraph", "Paragrafo elenco"),
+        new("Normal", "Normale", "Normal"), new("Title", "Titolo", "Title"), new("Subtitle", "Sottotitolo", "Subtitle"),
+        new("Heading1", "Titolo 1", "heading 1"), new("Heading2", "Titolo 2", "heading 2"), new("Heading3", "Titolo 3", "heading 3"),
+        new("Quote", "Citazione", "Quote"), new("ListParagraph", "Paragrafo elenco", "List Paragraph"),
     ];
 
     static readonly Dictionary<string, string> StyleXml = new()

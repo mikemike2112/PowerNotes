@@ -5,7 +5,7 @@ namespace PowerNotes.Core.Fonts;
 /// <summary>Trova i file font installati (registro Windows) e misura il testo con le metriche reali.</summary>
 public static class FontCatalog
 {
-    record Entry(string File, int Index);
+    public record Entry(string File, int Index);
 
     static readonly Dictionary<string, Entry> Map = Build();   // chiave: "famiglia|b|i"
     static readonly Dictionary<string, FontFile?> Cache = new();
@@ -70,19 +70,26 @@ public static class FontCatalog
         }
     }
 
+    /// <summary>File del font che verrà usato per (famiglia, stile): con ripiego su stile base e poi su Arial.</summary>
+    public static Entry? Resolve(string family, bool bold, bool italic)
+    {
+        lock (Cache)
+        {
+            if (!Map.ContainsKey(Key(family, false, false))) ScanCloud(family);
+            foreach (var cand in new[] { (family, bold, italic), (family, bold, false), (family, false, italic), (family, false, false), (Fallback, bold, italic), (Fallback, false, false) })
+                if (Map.TryGetValue(Key(cand.Item1, cand.Item2, cand.Item3), out var e)) return e;
+            return null;
+        }
+    }
+
     public static FontFile Get(string family, bool bold, bool italic)
     {
         var ck = Key(family, bold, italic);
         lock (Cache)
         {
-            if (!Map.ContainsKey(Key(family, false, false))) ScanCloud(family);
             if (Cache.TryGetValue(ck, out var f) && f != null) return f;
-            foreach (var cand in new[] { (family, bold, italic), (family, bold, false), (family, false, italic), (family, false, false), (Fallback, bold, italic), (Fallback, false, false) })
-                if (Map.TryGetValue(Key(cand.Item1, cand.Item2, cand.Item3), out var e))
-                {
-                    try { f = FontFile.Load(e.File, e.Index); Cache[ck] = f; return f; } catch (Exception ex) when (ex is IOException or KeyNotFoundException or ArgumentException or UnauthorizedAccessException) { }
-                }
-            throw new InvalidOperationException($"Nessun font disponibile per '{family}' (né il predefinito {Fallback}).");
+            var e = Resolve(family, bold, italic) ?? throw new InvalidOperationException($"Nessun font disponibile per '{family}' (né il predefinito {Fallback}).");
+            f = FontFile.Load(e.File, e.Index); Cache[ck] = f; return f;
         }
     }
 

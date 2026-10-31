@@ -1,0 +1,254 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using PowerNotes.Core.Edit;
+using PowerNotes.Core.Layout;
+using PowerNotes.Core.Model;
+using Paragraph = DocumentFormat.OpenXml.Wordprocessing.Paragraph;
+
+namespace PowerNotes.App;
+
+/// <summary>Superficie di editing custom ("Layout di stampa"): disegna le pagine prodotte dal motore di layout, con caret e selezione. Non è un RichTextBox.</summary>
+public sealed class DocumentView : FrameworkElement
+{
+    const double GapDip = 18, SideDip = 28;
+    EditorSession? _s;
+    LayoutResult? _cachedFor;
+    readonly Dictionary<int, DrawingGroup> _cache = new();
+    bool _caretOn = true;
+    readonly DispatcherTimer _blink = new() { Interval = TimeSpan.FromMilliseconds(530) };
+    bool _dragging;
+
+    public ScrollViewer? Scroller { get; set; }
+    public double Zoom { get; private set; } = 1.0;
+    public event Action? StateChanged;
+    public Brush? PaperShadow { get; set; } = new SolidColorBrush(Color.FromArgb(70, 0, 0, 0));
+
+    double Scale => Zoom * 96.0 / 72.0;
+
+    public DocumentView()
+    {
+        Focusable = true; FocusVisualStyle = null; Cursor = Cursors.IBeam;
+        HorizontalAlignment = HorizontalAlignment.Stretch; VerticalAlignment = VerticalAlignment.Top;
+        _blink.Tick += (_, _) => { _caretOn = !_caretOn; InvalidateVisual(); };
+        _blink.Start();
+        // IME / testo: ricevuto da OnTextInput
+        InputMethod.SetIsInputMethodEnabled(this, true);
+    }
+
+    public EditorSession? Session
+    {
+        get => _s;
+        set { _s = value; _cachedFor = null; Refresh(); }
+    }
+
+    public int PageCount => _s?.Layout.Pages.Count ?? 0;
+
+    public int CaretPage
+    {
+        get { if (_s == null) return 0; var l = _s.Layout.Locate(_s.Caret.P, _s.Caret.Off); return (l?.PageIndex ?? 0) + 1; }
+    }
+
+    public void SetZoom(double z)
+    {
+        Zoom = Math.Clamp(z, 0.25, 4.0);
+        InvalidateMeasure(); InvalidateVisual(); StateChanged?.Invoke();
+    }
+
+    /// <summary>Da chiamare dopo ogni modifica o cambio di selezione.</summary>
+    public void Refresh(bool scrollToCaret = false)
+    {
+        InvalidateMeasure(); InvalidateVisual();
+        _caretOn = true; _blink.Stop(); _blink.Start();
+        if (scrollToCaret) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, ScrollToCaret);
+        StateChanged?.Invoke();
+    }
+
+    // ---- geometria ----
+    (double w, double h, List<double> tops) Metrics()
+    {
+        var tops = new List<double>();
+        double y = GapDip, w = 0;
+        if (_s != null)
+            foreach (var p in _s.Layout.Pages)
+            {
+                tops.Add(y);
+                y += p.Height * Scale + GapDip;
+                w = Math.Max(w, p.Width * Scale);
+            }
+        return (w + 2 * SideDip, y, tops);
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var (w, h, _) = Metrics();
+        return new Size(w, h);
+    }
+
+    Rect PageRect(int i, List<double> tops)
+    {
+        var p = _s!.Layout.Pages[i];
+        double pw = p.Width * Scale;
+        double left = Math.Max(SideDip, (ActualWidth - pw) / 2);
+        return new Rect(left, tops[i], pw, p.Height * Scale);
+    }
+
+    // ---- disegno ----
+    protected override void OnRender(DrawingContext dc)
+    {
+        dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        if (_s == null) return;
+        var L = _s.Layout;
+        if (!ReferenceEquals(L, _cachedFor)) { _cache.Clear(); _cachedFor = L; }
+        var (_, _, tops) = Metrics();
+        double vTop = Scroller?.VerticalOffset ?? 0, vBot = vTop + (Scroller?.ViewportHeight ?? ActualHeight);
+        double ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var idx = new Dictionary<Paragraph, int>();
+        var paras = _s.Paragraphs();
+        for (int i = 0; i < paras.Count; i++) idx[paras[i]] = i;
+        var (s, e) = _s.Range;
+        int si = (idx.TryGetValue(s.P, out var q1) ? q1 : 0), ei = (idx.TryGetValue(e.P, out var q2) ? q2 : 0);
+        var selBrush = new SolidColorBrush(Color.FromArgb(90, 79, 140, 255));
+        LineBox? caretLine = _s.Layout.Locate(_s.Caret.P, _s.Caret.Off);
+
+        for (int i = 0; i < L.Pages.Count; i++)
+        {
+            var r = PageRect(i, tops);
+            if (r.Bottom < vTop - 50 || r.Top > vBot + 50) continue;
+            dc.DrawRectangle(PaperShadow, null, new Rect(r.X + 3, r.Y + 3, r.Width, r.Height));
+            dc.PushTransform(new TranslateTransform(r.X, r.Y));
+            dc.PushTransform(new ScaleTransform(Scale, Scale));
+            if (!_cache.TryGetValue(i, out var g))
+            {
+                g = new DrawingGroup();
+                using (var gc = g.Open()) PageRenderer.Draw(gc, L.Pages[i], ppd);
+                g.Freeze();
+                _cache[i] = g;
+            }
+            dc.DrawDrawing(g);
+            if (_s.HasSelection)
+                foreach (var l in L.Pages[i].Lines)
+                {
+                    if (!idx.TryGetValue(l.Para, out var ip) || ip < si || ip > ei) continue;
+                    int a = ip == si ? Math.Max(s.Off, l.Start) : l.Start;
+                    int b = ip == ei ? Math.Min(e.Off, l.End) : l.End;
+                    double x1 = l.XAt(a), x2 = l.XAt(b);
+                    if (ip < ei && l.LastOfPara) x2 += 4;      // segno di paragrafo selezionato
+                    if (x2 <= x1 && !(a < b)) continue;
+                    dc.DrawRectangle(selBrush, null, new Rect(x1, l.Y, Math.Max(1, x2 - x1), l.Height));
+                }
+            if (_caretOn && !_s.HasSelection && caretLine != null && caretLine.PageIndex == i && IsKeyboardFocused)
+            {
+                double cx = caretLine.XAt(_s.Caret.Off);
+                dc.DrawRectangle(Brushes.Black, null, new Rect(cx, caretLine.Y, 0.9 / Scale * 1.0 + 0.4, caretLine.Height));
+            }
+            dc.Pop(); dc.Pop();
+        }
+    }
+
+    void ScrollToCaret()
+    {
+        if (_s == null || Scroller == null) return;
+        var l = _s.Layout.Locate(_s.Caret.P, _s.Caret.Off);
+        if (l == null) return;
+        var (_, _, tops) = Metrics();
+        var r = PageRect(l.PageIndex, tops);
+        double y = r.Y + l.Y * Scale, h = l.Height * Scale;
+        double top = Scroller.VerticalOffset, vp = Scroller.ViewportHeight;
+        if (y < top + 8) Scroller.ScrollToVerticalOffset(Math.Max(0, y - 40));
+        else if (y + h > top + vp - 8) Scroller.ScrollToVerticalOffset(y + h - vp + 40);
+        double x = r.X + l.XAt(_s.Caret.Off) * Scale;
+        if (x < Scroller.HorizontalOffset + 8) Scroller.ScrollToHorizontalOffset(Math.Max(0, x - 40));
+        else if (x > Scroller.HorizontalOffset + Scroller.ViewportWidth - 8) Scroller.ScrollToHorizontalOffset(x - Scroller.ViewportWidth + 60);
+    }
+
+    // ---- mouse ----
+    (int page, double x, double y)? ToPage(Point p)
+    {
+        if (_s == null || _s.Layout.Pages.Count == 0) return null;
+        var (_, _, tops) = Metrics();
+        int best = 0;
+        for (int i = 0; i < tops.Count; i++) if (p.Y >= tops[i] - GapDip / 2) best = i;
+        var r = PageRect(best, tops);
+        return (best, (p.X - r.X) / Scale, (p.Y - r.Y) / Scale);
+    }
+
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    {
+        Focus();
+        if (_s == null) return;
+        var hit = ToPage(e.GetPosition(this));
+        if (hit == null) return;
+        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        _s.SetCaretAt(hit.Value.page, hit.Value.x, hit.Value.y, shift);
+        if (e.ClickCount == 2) _s.SelectWord();
+        else if (e.ClickCount >= 3) { _s.SetCaret(_s.Caret.P, 0); _s.SetCaret(_s.Caret.P, ParaText.Length(_s.Caret.P), true); }
+        _dragging = e.ClickCount == 1;
+        if (_dragging) CaptureMouse();
+        Refresh();
+        e.Handled = true;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (!_dragging || _s == null) return;
+        var hit = ToPage(e.GetPosition(this));
+        if (hit == null) return;
+        _s.SetCaretAt(hit.Value.page, hit.Value.x, hit.Value.y, true);
+        Refresh(true);
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) { if (_dragging) { _dragging = false; ReleaseMouseCapture(); } }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) { SetZoom(Zoom * (e.Delta > 0 ? 1.1 : 1 / 1.1)); e.Handled = true; }
+    }
+
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e) => InvalidateVisual();
+    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e) => InvalidateVisual();
+
+    // ---- tastiera ----
+    protected override void OnTextInput(TextCompositionEventArgs e)
+    {
+        if (_s == null || string.IsNullOrEmpty(e.Text)) return;
+        var t = new string(e.Text.Where(c => !char.IsControl(c) || c == '\t').ToArray());
+        if (t.Length == 0) return;
+        _s.Type(t); Refresh(true); e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (_s == null) return;
+        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift), ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        bool edit = false, handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        switch (key)
+        {
+            case Key.Left: _s.MoveHorizontal(-1, shift, ctrl); break;
+            case Key.Right: _s.MoveHorizontal(1, shift, ctrl); break;
+            case Key.Up: _s.MoveVertical(-1, shift); break;
+            case Key.Down: _s.MoveVertical(1, shift); break;
+            case Key.PageUp: _s.MoveVertical(-1, shift, ViewportPt()); break;
+            case Key.PageDown: _s.MoveVertical(1, shift, ViewportPt()); break;
+            case Key.Home: _s.MoveLineEdge(false, shift, ctrl); break;
+            case Key.End: _s.MoveLineEdge(true, shift, ctrl); break;
+            case Key.Back: _s.Backspace(); edit = true; break;
+            case Key.Delete: _s.DeleteForward(); edit = true; break;
+            case Key.Enter: if (shift) _s.SoftBreak(); else _s.Enter(); edit = true; break;
+            case Key.Tab:
+                if (!_s.TabInTable(shift)) { if (_s.AtListStart) _s.ChangeIndent(shift ? -36 : 36); else _s.Type("\t"); }
+                edit = true; break;
+            default: handled = false; break;
+        }
+        if (handled) { e.Handled = true; Refresh(true); }
+        _ = edit;
+    }
+
+    double ViewportPt() => (Scroller?.ViewportHeight ?? 600) / Scale * 0.9;
+
+    // ---- stampa/PDF: stessa pipeline ----
+    public LayoutResult? Layout => _s?.Layout;
+}

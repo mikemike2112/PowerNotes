@@ -1,12 +1,157 @@
-﻿<Window x:Class="PowerNotes.App.MainWindow"
+<Window x:Class="PowerNotes.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:PowerNotes.App"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        xmlns:app="clr-namespace:PowerNotes.App"
+        Title="PowerNotes" Width="1280" Height="860" MinWidth="900" MinHeight="500" WindowStartupLocation="CenterScreen">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
+        <!-- barra superiore -->
+        <Border Grid.Row="0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+            <DockPanel Margin="6,4">
+                <Button x:Name="FileButton" Content="File" Click="FileButton_Click" Padding="14,4" BorderBrush="{DynamicResource AccentBrush}" ToolTip="Nuovo, Apri, Salva, Esporta PDF, Stampa">
+                    <Button.ContextMenu>
+                        <ContextMenu x:Name="FileMenu">
+                            <MenuItem Header="Nuovo" InputGestureText="Ctrl+N" Click="New_Click"/>
+                            <MenuItem Header="Apri…" InputGestureText="Ctrl+O" Click="Open_Click"/>
+                            <MenuItem Header="Salva" InputGestureText="Ctrl+S" Click="Save_Click"/>
+                            <MenuItem Header="Salva con nome…" Click="SaveAs_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Esporta in PDF…" Click="Pdf_Click"/>
+                            <MenuItem Header="Stampa…" InputGestureText="Ctrl+P" Click="Print_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Esci" Click="Exit_Click"/>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+                <TextBlock x:Name="TitleText" DockPanel.Dock="Right" Margin="12,0" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" Text="PowerNotes"/>
+                <TabControl x:Name="Ribbon" SelectedIndex="0" Margin="10,0,0,0" Padding="0">
+                    <TabItem Header="Home"/>
+                    <TabItem Header="Inserisci"/>
+                    <TabItem Header="Layout"/>
+                    <TabItem Header="Tabella" x:Name="TableTab"/>
+                    <TabItem Header="Visualizza"/>
+                </TabControl>
+            </DockPanel>
+        </Border>
+
+        <!-- contenuto del ribbon -->
+        <Border Grid.Row="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Height="84">
+            <Grid>
+                <!-- HOME -->
+                <StackPanel x:Name="HomePanel" Orientation="Horizontal" Margin="8,4">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="↶" ToolTip="Annulla (Ctrl+Z)" Click="Undo_Click"/>
+                            <Button Content="↷" ToolTip="Ripeti (Ctrl+Y)" Click="Redo_Click"/>
+                            <Button Content="Incolla" Click="Paste_Click"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Copia" Click="Copy_Click"/>
+                            <Button Content="Taglia" Click="Cut_Click"/>
+                        </StackPanel>
+                        <TextBlock Text="Appunti" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/>
+                    </StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox x:Name="FontBox" Width="150" IsEditable="True" ToolTip="Tipo di carattere" DropDownClosed="Font_Changed"/>
+                            <ComboBox x:Name="SizeBox" Width="62" IsEditable="True" ToolTip="Dimensione" DropDownClosed="Size_Changed"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="BoldBtn" Content="G" FontWeight="Bold" ToolTip="Grassetto (Ctrl+B)" Click="Bold_Click"/>
+                            <ToggleButton x:Name="ItalicBtn" Content="C" FontStyle="Italic" ToolTip="Corsivo (Ctrl+I)" Click="Italic_Click"/>
+                            <ToggleButton x:Name="UnderBtn" ToolTip="Sottolineato (Ctrl+U)" Click="Under_Click"><TextBlock Text="S" TextDecorations="Underline"/></ToggleButton>
+                            <ToggleButton x:Name="StrikeBtn" ToolTip="Barrato" Click="Strike_Click"><TextBlock Text="ab" TextDecorations="Strikethrough"/></ToggleButton>
+                            <Button Content="x²" ToolTip="Apice" Click="Super_Click"/>
+                            <Button Content="x₂" ToolTip="Pedice" Click="Sub_Click"/>
+                            <Button x:Name="ColorBtn" Content="A▾" ToolTip="Colore del testo" Click="Color_Click"/>
+                            <Button x:Name="HlBtn" Content="▮▾" ToolTip="Evidenziazione" Click="Highlight_Click"/>
+                        </StackPanel>
+                        <TextBlock Text="Carattere" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/>
+                    </StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="AlLeft" Content="⯇≡" ToolTip="Allinea a sinistra (Ctrl+L)" Click="AlLeft_Click"/>
+                            <ToggleButton x:Name="AlCenter" Content="≡" ToolTip="Centra (Ctrl+E)" Click="AlCenter_Click"/>
+                            <ToggleButton x:Name="AlRight" Content="≡⯈" ToolTip="Allinea a destra (Ctrl+R)" Click="AlRight_Click"/>
+                            <ToggleButton x:Name="AlJust" Content="☰" ToolTip="Giustifica (Ctrl+J)" Click="AlJust_Click"/>
+                            <ComboBox x:Name="LineBox" Width="70" ToolTip="Interlinea" DropDownClosed="Line_Changed"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="•≡" ToolTip="Elenco puntato" Click="Bullets_Click"/>
+                            <Button Content="1.≡" ToolTip="Elenco numerato" Click="Numbers_Click"/>
+                            <Button Content="⇤" ToolTip="Riduci rientro" Click="OutIndent_Click"/>
+                            <Button Content="⇥" ToolTip="Aumenta rientro" Click="InIndent_Click"/>
+                            <Button Content="Paragrafo…" Click="ParaDialog_Click"/>
+                        </StackPanel>
+                        <TextBlock Text="Paragrafo" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/>
+                    </StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel>
+                        <ComboBox x:Name="StyleBox" Width="140" ToolTip="Stili" DropDownClosed="Style_Changed"/>
+                        <TextBlock Text="Stili" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/>
+                    </StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel>
+                        <Button Content="Trova…" ToolTip="Ctrl+F" Click="Find_Click"/>
+                        <Button Content="Sostituisci…" ToolTip="Ctrl+H" Click="Replace_Click"/>
+                        <TextBlock Text="Modifica" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- INSERISCI -->
+                <StackPanel x:Name="InsertPanel" Orientation="Horizontal" Margin="8,4" Visibility="Collapsed">
+                    <StackPanel><Button Content="Tabella…" Click="InsertTable_Click"/><Button Content="Immagine…" Click="InsertImage_Click"/><TextBlock Text="Inserimento" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><Button Content="Interruzione di pagina" Click="PageBreak_Click"/><Button Content="Interruzione di riga" Click="SoftBreak_Click"/><TextBlock Text="Pagine" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><Button Content="Intestazione…" Click="Header_Click"/><Button Content="Piè di pagina…" Click="Footer_Click"/><TextBlock Text="Intestazione e piè di pagina" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><Button Content="Numeri di pagina" ToolTip="Aggiunge il numero di pagina al piè di pagina" Click="PageNumbers_Click"/><TextBlock Text="Numerazione" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                </StackPanel>
+
+                <!-- LAYOUT -->
+                <StackPanel x:Name="LayoutPanel" Orientation="Horizontal" Margin="8,4" Visibility="Collapsed">
+                    <StackPanel><Button Content="Imposta pagina…" Click="PageSetup_Click"/><Button Content="Orientamento" Click="Orientation_Click"/><TextBlock Text="Impostazione pagina" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><Button Content="Paragrafo…" Click="ParaDialog_Click"/><TextBlock Text="Paragrafo" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                </StackPanel>
+
+                <!-- TABELLA -->
+                <StackPanel x:Name="TablePanel" Orientation="Horizontal" Margin="8,4" Visibility="Collapsed">
+                    <StackPanel><Button Content="Unisci celle" Click="MergeCells_Click"/><TextBlock Text="Unione" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><StackPanel Orientation="Horizontal"><Button Content="Riga sotto" Click="AddRow_Click"/><Button Content="Colonna a destra" Click="AddCol_Click"/></StackPanel><StackPanel Orientation="Horizontal"><Button Content="Elimina riga" Click="DelRow_Click"/><Button Content="Elimina tabella" Click="DelTable_Click"/></StackPanel><TextBlock Text="Righe e colonne" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                </StackPanel>
+
+                <!-- VISUALIZZA -->
+                <StackPanel x:Name="ViewPanel" Orientation="Horizontal" Margin="8,4" Visibility="Collapsed">
+                    <StackPanel><StackPanel Orientation="Horizontal"><Button Content="−" Click="ZoomOut_Click"/><Button Content="100%" Click="Zoom100_Click"/><Button Content="+" Click="ZoomIn_Click"/></StackPanel><TextBlock Text="Zoom" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                    <Separator Style="{x:Null}" Width="1" Background="{DynamicResource LineBrush}" Margin="6,4"/>
+                    <StackPanel><Button x:Name="ThemeBtn" Content="Tema chiaro/scuro" Click="Theme_Click"/><TextBlock Text="Tema" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,0"/></StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- area documento -->
+        <ScrollViewer x:Name="Scroller" Grid.Row="2" Background="{DynamicResource DeskBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Focusable="False">
+            <app:DocumentView x:Name="View"/>
+        </ScrollViewer>
+
+        <!-- barra di stato -->
+        <Border Grid.Row="3" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0">
+            <DockPanel Margin="10,3">
+                <TextBlock x:Name="ZoomText" DockPanel.Dock="Right" Foreground="{DynamicResource MutedBrush}" Text="100%"/>
+                <TextBlock x:Name="WordsText" DockPanel.Dock="Right" Margin="0,0,20,0" Foreground="{DynamicResource MutedBrush}"/>
+                <TextBlock x:Name="PageText" Foreground="{DynamicResource MutedBrush}"/>
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>

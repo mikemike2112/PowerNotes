@@ -6,6 +6,33 @@ namespace PowerNotes.Tests;
 
 public class LayoutCompareTests(ITestOutputHelper o)
 {
+    public static IEnumerable<object[]> Names => TestPaths.CorpusNames();
+
+    /// <summary>Conta di pagine del clone = ComputeStatistics di Word (valori letti da Word via COM, tools/word-inspect.ps1).</summary>
+    [Theory, MemberData(nameof(Names))]
+    public void PageCount_MatchesWord(string name)
+    {
+        using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, name + ".docx"));
+        Assert.Equal(TestPaths.Expected(name).GetProperty("pages").GetInt32(), d.Layout().Pages.Count);
+    }
+
+    /// <summary>Posizione verticale della prima riga di ogni paragrafo senza tabelle: scarto massimo ammesso 3 pt rispetto a Word.</summary>
+    [Theory, MemberData(nameof(Names))]
+    public void ParagraphPositions_CloseToWord(string name)
+    {
+        using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, name + ".docx"));
+        if (d.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.Table>().Any() || d.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.Drawing>().Any()) return;   // tabelle: indici paragrafo diversi in Word (fine riga)
+        var res = d.Layout(); var ps = d.Paragraphs(); var lines = TestPaths.Expected(name).GetProperty("lines");
+        Assert.Equal(lines.GetArrayLength(), ps.Count);
+        for (int i = 0; i < ps.Count; i++)
+        {
+            var l = res.LinesOf(ps[i]).FirstOrDefault();
+            if (l == null) continue;
+            Assert.Equal(lines[i][0].GetInt32(), l.PageIndex + 1);
+            Assert.True(Math.Abs(lines[i][1].GetDouble() - l.Y) <= 3.0, $"{name} p{i}: Word y={lines[i][1].GetDouble()} clone y={l.Y}");
+        }
+    }
+
     [Fact]
     public void Dump()
     {
