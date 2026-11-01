@@ -57,15 +57,38 @@ public partial class MainWindow : Window
     public void OpenPath(string path)
     {
         try { Load(WordDoc.Open(path)); }
-        catch (DocumentLoadException e) { MessageBox.Show(this, e.Message, "Impossibile aprire il documento", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (DocumentLoadException e) { ThemedDialog.Show(this, e.Message, "Impossibile aprire il documento", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 
+    string DocDisplayName => _doc.Path == null ? "Documento senza nome" : Path.GetFileName(_doc.Path);
+
+    /// <summary>Finestra di sistema, usata solo da "Sfoglia…"/"Altre opzioni…". Restituisce il percorso scelto.</summary>
+    string? BrowseSave((string Folder, string Name) cur)
+    {
+        var dlg = new SaveFileDialog { Filter = "Documenti (*.docx)|*.docx", DefaultExt = ".docx", FileName = cur.Name, OverwritePrompt = false };
+        if (Directory.Exists(cur.Folder)) dlg.InitialDirectory = cur.Folder;
+        return dlg.ShowDialog(this) == true ? dlg.FileName : null;
+    }
+
+    /// <summary>Richiesta di salvataggio (chiusura, Nuovo, Apri). true = si può procedere.</summary>
     bool ConfirmDiscard()
     {
         if (_doc == null || !_doc.Dirty) return true;
-        var r = MessageBox.Show(this, "Il documento ha modifiche non salvate. Salvarle?", "PowerNotes", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-        if (r == MessageBoxResult.Cancel) return false;
-        return r == MessageBoxResult.No || SaveCore(false);
+        return RunSave(askDiscard: true);
+    }
+
+    bool RunSave(bool askDiscard)
+    {
+        string folder = _doc.Path != null ? Path.GetDirectoryName(_doc.Path)! : SaveFlow.SuggestedFolder();
+        return SaveFlow.Run(
+            err => ThemedDialog.SavePrompt(this, DocDisplayName, askDiscard, _doc.Path == null, folder, err, BrowseSave),
+            path => ThemedDialog.Show(this, $"Il file «{Path.GetFileName(path)}» esiste già. Vuoi sostituirlo?", "Sostituire il file?", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
+            path =>
+            {
+                try { _doc.Save(path); UpdateTitle(); }
+                catch (Exception e) when (e is InvalidOperationException or DocumentLoadException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException) { throw new IOException(e.Message, e); }
+            },
+            _doc.Path);
     }
 
     void UpdateTitle()
@@ -77,19 +100,16 @@ public partial class MainWindow : Window
 
     bool SaveCore(bool saveAs)
     {
-        var path = _doc.Path;
-        if (saveAs || path == null)
+        if (!saveAs && _doc.Path != null)
         {
-            var dlg = new SaveFileDialog { Filter = "Documento Word (*.docx)|*.docx", DefaultExt = ".docx", FileName = path == null ? "Documento.docx" : Path.GetFileName(path) };
-            if (dlg.ShowDialog(this) != true) return false;
-            path = dlg.FileName;
+            try { _doc.Save(); UpdateTitle(); return true; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or DocumentLoadException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
+            {
+                ThemedDialog.Show(this, "Salvataggio non riuscito, il file originale non è stato modificato." + Environment.NewLine + Environment.NewLine + e.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
         }
-        try { _doc.Save(path); UpdateTitle(); return true; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or DocumentLoadException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
-        {
-            MessageBox.Show(this, "Salvataggio non riuscito, il file originale non è stato modificato.\n\n" + e.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
-            return false;
-        }
+        return RunSave(askDiscard: false);
     }
 
     // ---------- menu File ----------
@@ -97,7 +117,7 @@ public partial class MainWindow : Window
     void Open_Click(object s, RoutedEventArgs e)
     {
         if (!ConfirmDiscard()) return;
-        var dlg = new OpenFileDialog { Filter = "Documenti Word (*.docx)|*.docx" };
+        var dlg = new OpenFileDialog { Filter = "Documenti (*.docx)|*.docx" };
         if (dlg.ShowDialog(this) == true) OpenPath(dlg.FileName);
     }
     void Save_Click(object s, RoutedEventArgs e) => SaveCore(false);
@@ -109,7 +129,7 @@ public partial class MainWindow : Window
         var dlg = new SaveFileDialog { Filter = "PDF (*.pdf)|*.pdf", DefaultExt = ".pdf", FileName = Path.GetFileNameWithoutExtension(_doc.Path ?? "Documento") + ".pdf" };
         if (dlg.ShowDialog(this) != true) return;
         try { File.WriteAllBytes(dlg.FileName, PdfExporter.Export(_s.Layout, Path.GetFileNameWithoutExtension(dlg.FileName))); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { MessageBox.Show(this, "Esportazione PDF non riuscita: " + ex.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { ThemedDialog.Show(this, "Esportazione PDF non riuscita: " + ex.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     void Print_Click(object s, RoutedEventArgs e)
@@ -117,7 +137,7 @@ public partial class MainWindow : Window
         var pd = new PrintDialog { UserPageRangeEnabled = true, MinPage = 1, MaxPage = (uint)Math.Max(1, View.PageCount) };
         if (pd.ShowDialog() != true) return;
         try { pd.PrintDocument(new LayoutPaginator(_s.Layout), Path.GetFileName(_doc.Path ?? "Documento")); }
-        catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintQueueException) { MessageBox.Show(this, "Stampa non riuscita: " + ex.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintQueueException) { ThemedDialog.Show(this, "Stampa non riuscita: " + ex.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     // ---------- scorciatoie ----------
@@ -147,7 +167,7 @@ public partial class MainWindow : Window
     {
         try { a(); }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
-        { MessageBox.Show(this, ex.Message, "PowerNotes", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        { ThemedDialog.Show(this, ex.Message, "PowerNotes", MessageBoxButton.OK, MessageBoxImage.Warning); }
         View.Refresh(true);
         View.Focus();
     }
@@ -247,7 +267,7 @@ public partial class MainWindow : Window
             new FormField("Interlinea (multiplo)", F(f.LineRule == "auto" ? f.Line / 240 : 1)));
         if (d.ShowDialog() != true) return;
         var v = d.Numbers();
-        if (v == null) { MessageBox.Show(this, "Valori numerici non validi.", "Paragrafo"); return; }
+        if (v == null) { ThemedDialog.Show(this, "Valori numerici non validi.", "Paragrafo"); return; }
         Do(() => { _s.SetIndent(v[0], v[1], v[2]); _s.SetSpacing(v[3], v[4]); if (v[5] >= 0.5 && v[5] <= 9) _s.SetLineSpacing(v[5]); });
     }
 
@@ -269,7 +289,7 @@ public partial class MainWindow : Window
         var d = new FormDialog(this, "Inserisci tabella", new FormField("Righe", "3"), new FormField("Colonne", "3"));
         if (d.ShowDialog() != true) return;
         var v = d.Numbers();
-        if (v == null || v[0] < 1 || v[1] < 1 || v[0] > 200 || v[1] > 30) { MessageBox.Show(this, "Righe da 1 a 200, colonne da 1 a 30.", "Tabella"); return; }
+        if (v == null || v[0] < 1 || v[1] < 1 || v[0] > 200 || v[1] > 30) { ThemedDialog.Show(this, "Righe da 1 a 200, colonne da 1 a 30.", "Tabella"); return; }
         Do(() => _s.InsertTable((int)v[0], (int)v[1]));
     }
 
@@ -320,7 +340,7 @@ public partial class MainWindow : Window
         bool land = v[1] == "Orizzontale";
         var m = new double[4];
         for (int i = 0; i < 4; i++)
-            if (!double.TryParse(v[2 + i].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out m[i]) || m[i] < 0) { MessageBox.Show(this, "Margini non validi.", "Imposta pagina"); return; }
+            if (!double.TryParse(v[2 + i].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out m[i]) || m[i] < 0) { ThemedDialog.Show(this, "Margini non validi.", "Imposta pagina"); return; }
         Do(() => _s.SetPageSetup(new EditorSession.PageInfo(w, h, land, m[0] * Cm, m[1] * Cm, m[2] * Cm, m[3] * Cm)));
     }
 
@@ -331,7 +351,7 @@ public partial class MainWindow : Window
     }
 
     // ---------- tabella ----------
-    void MergeCells_Click(object s, RoutedEventArgs e) => Do(() => { if (!_s.MergeCells()) MessageBox.Show(this, "Seleziona almeno due celle della stessa tabella (trascina con il mouse).", "Unisci celle"); });
+    void MergeCells_Click(object s, RoutedEventArgs e) => Do(() => { if (!_s.MergeCells()) ThemedDialog.Show(this, "Seleziona almeno due celle della stessa tabella (trascina con il mouse).", "Unisci celle"); });
     void AddRow_Click(object s, RoutedEventArgs e) => Do(() => _s.AddRowBelow());
     void AddCol_Click(object s, RoutedEventArgs e) => Do(() => _s.AddColumnRight());
     void DelRow_Click(object s, RoutedEventArgs e) => Do(() => _s.DeleteRow());

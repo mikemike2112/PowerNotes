@@ -11,6 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Product>PowerNotes</Product>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\powernotes.ico</ApplicationIcon>
     <AssemblyName>PowerNotes</AssemblyName>
     <RootNamespace>PowerNotes.App</RootNamespace>

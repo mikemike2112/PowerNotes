@@ -12,11 +12,11 @@ public partial class App : Application
         base.OnStartup(e);
         DispatcherUnhandledException += (_, ex) =>
         {
-            MessageBox.Show("Errore imprevisto: " + ex.Exception.Message + "\n\nSalva il lavoro e riavvia PowerNotes.", "PowerNotes", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show("Errore imprevisto: " + ex.Exception.Message + "\n\nSalva il lavoro e riavvia PowerNotes.", "PowerNotes", MessageBoxButton.OK, MessageBoxImage.Error);
             ex.Handled = true;
         };
         var w = new MainWindow();
-        string? shot = null; double zoom = 1; bool light = false; int tab = 0; int sel = 0;
+        string? dlgShot = null; string? shot = null; double zoom = 1; bool light = false; int tab = 0; int sel = 0;
         string? path = null; string? selftest = null;
         for (int i = 0; i < e.Args.Length; i++)
         {
@@ -27,6 +27,7 @@ public partial class App : Application
                 case "--light": light = true; break;
                 case "--tab": tab = int.Parse(e.Args[++i]); break;
                 case "--select": sel = int.Parse(e.Args[++i]); break;
+                case "--dialog-shot": dlgShot = e.Args[++i]; break;
                 case "--selftest": selftest = e.Args[++i]; break;
                 default: path ??= e.Args[i]; break;
             }
@@ -37,6 +38,17 @@ public partial class App : Application
         w.SelectTab(tab);
         if (shot == null && selftest == null) w.WindowState = WindowState.Maximized;
         w.Show();
+        if (dlgShot != null)
+        {
+            // schermata della richiesta di salvataggio: PrintWindow della sola finestra del dialogo, nessun input
+            w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, async () =>
+            {
+                var d = ThemedDialog.PreviewSave(w, "Relazione.docx");
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); await Task.Delay(400);
+                DialogShot.Capture(d, dlgShot);
+                d.Close(); Shutdown();
+            });
+        }
         if (selftest != null)
         {
             w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, async () =>
