@@ -23,8 +23,11 @@ public sealed class SegBox
     public bool Synthetic;   // etichetta di numerazione: non mappata a offset
 }
 
+public enum Story { Body, Header, Footer }
+
 public sealed class LineBox
 {
+    public Story Story;
     public required Paragraph Para;
     public int PageIndex;
     public int Start, End;
@@ -78,7 +81,7 @@ public sealed class LineBox
 public sealed class Page
 {
     public int Index, Number;
-    public double Width, Height;
+    public double Width, Height, MarL, MarR, MarT, MarB;
     public List<Prim> Prims = new();
     public List<LineBox> Lines = new();
 }
@@ -109,13 +112,14 @@ public sealed class LayoutResult
     }
 
     /// <summary>Hit-test: pagina e punto → (paragrafo, offset).</summary>
-    public (Paragraph Para, int Offset, LineBox Line)? HitTest(int pageIndex, double x, double y)
+    public (Paragraph Para, int Offset, LineBox Line)? HitTest(int pageIndex, double x, double y, bool headerFooter = false)
     {
         if (pageIndex < 0 || pageIndex >= Pages.Count) return null;
         var pg = Pages[pageIndex];
         LineBox? best = null; double bestD = double.MaxValue;
         foreach (var l in pg.Lines)
         {
+            if ((l.Story != Story.Body) != headerFooter) continue;
             double d = y < l.Y ? l.Y - y : y > l.Y + l.Height ? y - (l.Y + l.Height) : 0;
             double dx = x < l.Left ? l.Left - x : x > l.Right ? x - l.Right : 0;
             d += dx * 0.01;     // a parità di quota preferisce la cella/colonna giusta

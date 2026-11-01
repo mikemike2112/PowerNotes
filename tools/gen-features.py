@@ -12,9 +12,9 @@ DONE = {  # comando -> nota (implementato E coperto da test)
  'Interruzione di pagina': '', 'Tabella': 'inserimento, celle unite, righe/colonne', 'Immagini': 'inline PNG/JPEG/GIF/BMP',
  'Intestazione': 'finestra dedicata', 'Piè di pagina': 'finestra dedicata', 'Numero di pagina': 'Pagina X di Y nel piè di pagina',
  'Imposta pagina...': 'formato, orientamento, margini', 'Margini': 'in Imposta pagina', 'Orientamento': '', 'Dimensioni': 'A4, A5, Letter, Legal',
- 'Layout di stampa': 'unica vista', '100%': '', 'Zoom...': 'pulsanti −/+/100% e Ctrl+rotella',
+ 'Layout di stampa': 'unica vista', 'Carattere...': 'finestra Carattere completa (launcher del gruppo)', 'Ingrandisci carattere': 'passi 8-72', 'Riduci carattere': 'passi 8-72', 'Colonne': 'menu 1/2/3 colonne uguali', 'Interruzioni': 'pagina, sezione pagina successiva, sezione continua', 'Righello': 'cm, con margini', 'Una pagina': '', 'Larghezza pagina': '', 'Seleziona': 'Seleziona tutto', '100%': '', 'Zoom...': 'pulsanti −/+/100% e Ctrl+rotella',
 }
-P0 = set(DONE) | {'Carattere...', 'Ingrandisci carattere', 'Riduci carattere', 'Colonne', 'Interruzioni', 'Annulla', 'Ripeti'}
+P0 = set(DONE) | {'Annulla', 'Ripeti'}
 P1 = {'Cancella formattazione','Mostra tutto','Sfondo','Bordi','Seleziona','Pagina vuota','Collegamento','Segnalibro...','Inserisci nota a piè di pagina','Conteggio parole','Ortografia e Grammatica','Rilevamento modifiche','Nuovo commento','Colonne','Interruzioni','Larghezza pagina','Una pagina','Righello','Sommario','Copia formato','Maiuscole/minuscole','Ordina...','Sillabazione','Numeri di riga','Casella di testo','Forme','Simbolo','Equazione','Commento'}
 out = io.StringIO()
 w = lambda s='': out.write(s + '\n')
@@ -29,7 +29,9 @@ for n, ok, pr, note in [
   ('Stampa (paginatore sul layout, finestra di stampa di sistema)', True, 'P0', 'verificato con scrittura XPS dal paginatore nell\'autotest UI; la stampa su carta reale non è stata provata'),
   ('Annulla / Ripeti (istantanee XML, digitazione raggruppata)', True, 'P0', ''),
   ('Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click', True, 'P0', 'test sessione + autotest UI'),
-  ('Tema scuro/chiaro commutabile', False, 'P1', 'implementato, verificato solo con screenshot'),
+  ('Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito)', True, 'P0', 'test con mouse reale, screenshot dei due temi, riavvio, file corrotto'),
+  ('Appunti con formattazione (frammento OOXML + testo)', True, 'P1', 'test sessione; tra documenti le immagini sono omesse'),
+  ('Casella Cerca del titolo: esegue comandi o cerca nel testo', True, 'P1', 'verificata a mano'),
   ('Salvataggio con password, firma, versioni', False, 'P2', ''),
 ]:
     w(f"- [{'x' if ok else ' '}] **{pr}** {n}" + (f' — {note}' if note else ''))
@@ -44,7 +46,5 @@ for tab in inv['schede']:
             ok = it in DONE
             pr = 'P0' if it in P0 else 'P1' if it in P1 else 'P2'
             note = DONE.get(it, '')
-            if not ok and it in ('Colonne',): note = 'solo rendering (test del corpus); nessun comando'
-            if not ok and it in ('Interruzioni',): note = 'interruzione di pagina sì; interruzione di sezione solo letta/mostrata'
             w(f"- [{'x' if ok else ' '}] **{pr}** {it}" + (f' — {note}' if note else ''))
 open('FEATURES.md', 'w', encoding='utf-8').write(out.getvalue())

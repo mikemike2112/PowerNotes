@@ -27,4 +27,4 @@ Solo dipendenze con licenza MIT, Apache-2.0 o BSD. Licenza verificata sul campo 
 
 ## Font
 
-L'applicazione **non include font**: misura e disegna con i font installati nel PC (cartella Windows e cache dei font cloud di Office, in sola lettura). Nessun nome, logo, icona o risorsa Microsoft è incluso nel repository. L'icona è generata da `tools/make-icon.ps1`.
+L'applicazione **non include font**: misura e disegna con i font installati nel PC (cartella Windows e cache dei font cloud di Office, in sola lettura). Nessun nome, logo, icona o risorsa Microsoft è incluso nel repository. L'icona dell'applicazione (`src/PowerNotes.App/Assets/powernotes-icon.png`, da cui è ricavato `powernotes.ico`) è **fornita dall'autore del progetto**; il colore d'accento `#0BCCEA` è campionato dal suo sfondo.
