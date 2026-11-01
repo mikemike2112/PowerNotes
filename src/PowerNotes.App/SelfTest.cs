@@ -109,11 +109,29 @@ static class SelfTest
         KeyDown(v, Key.Tab); TextIn(v, "cella"); await Idle();
         Check(s.InTable, "Tab si sposta nella cella successiva");
         w.SelectTab(0);
+        // trova e sostituisci (finestra reale)
+        var fd = new FindDialog(w, s, () => v.Refresh()); fd.Show(); await Idle();
+        var boxes = new List<TextBox>(); void Collect(DependencyObject o) { for (int i = 0; i < VisualTreeHelper.GetChildrenCount(o); i++) { var c = VisualTreeHelper.GetChild(o, i); if (c is TextBox t) boxes.Add(t); Collect(c); } }
+        fd.SetMode(true); Collect(fd);
+        boxes[0].Text = "paragrafo"; boxes[1].Text = "capitolo";
+        var all = Find<ButtonBase>(fd, x => x.Content is string c && c == "Sostituisci tutto")!;
+        all.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle(); fd.Close();
+        Check(w.Session.Paragraphs().Any(p => ParaText.Text(p).Contains("Primo capitolo")), "Sostituisci tutto");
+        // pagina: orientamento, interruzione di pagina, intestazione e numeri di pagina
+        w.SelectTab(2); ClickButton(w, "Orientamento"); await Idle();
+        Check(s.Layout.Pages[0].Width > s.Layout.Pages[0].Height, "orientamento orizzontale");
+        w.SelectTab(1); s.SetCaret(w.Session.Paragraphs()[^1], ParaText.Length(w.Session.Paragraphs()[^1])); ClickButton(w, "Interruzione di pagina"); await Idle();
+        TextIn(v, "Pagina due"); ClickButton(w, "Numeri di pagina"); await Idle();
+        Check(s.Layout.Pages.Count == 2 && s.Layout.Pages[1].Prims.OfType<PowerNotes.Core.Layout.TextPrim>().Any(t => t.Text == "2"), "interruzione di pagina e numero di pagina sulla seconda pagina");
+        w.SelectTab(0);
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
-        using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo paragrafo"), "salvataggio e riapertura");
+        using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");
         var pdf = Path.Combine(dir, "selftest.pdf"); File.WriteAllBytes(pdf, PdfExporter.Export(s.Layout, "selftest"));
         Check(new FileInfo(pdf).Length > 1000, "esportazione PDF");
+        var xps = Path.Combine(dir, "selftest.xps");
+        using (var x = new System.Windows.Xps.Packaging.XpsDocument(xps, FileAccess.ReadWrite)) System.Windows.Xps.Packaging.XpsDocument.CreateXpsDocumentWriter(x).Write(new LayoutPaginator(s.Layout));
+        Check(new FileInfo(xps).Length > 1000, "stampa: il paginatore scrive il documento XPS");
         v.SetZoom(0.8); await Idle();
         Shot(w, Path.Combine(dir, "selftest.png"));
         File.WriteAllLines(Path.Combine(dir, "selftest.txt"), Log);

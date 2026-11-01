@@ -387,4 +387,36 @@ public class EditorTests
             Assert.True(bytes.Length > 500, f);
         }
     }
+
+    [Fact]
+    public void StrikeSuperSubscript_And_CutPaste()
+    {
+        var (d, s) = NewDoc();
+        s.Type("abcdef");
+        var p = s.Paragraphs()[0];
+        s.SetCaret(p, 1); s.SetCaret(p, 3, true); s.ToggleStrike();
+        s.SetCaret(p, 2); Assert.True(s.FormatAtCaret().Strike);
+        s.SetCaret(p, 3); s.SetCaret(p, 5, true); s.SetVertAlign(1);
+        s.SetCaret(p, 5); Assert.Equal(1, s.FormatAtCaret().VertAlign);
+        s.SetCaret(p, 3); s.SetCaret(p, 5, true); s.SetVertAlign(-1);
+        s.SetCaret(p, 5); Assert.Equal(-1, s.FormatAtCaret().VertAlign);
+        s.SetCaret(p, 1); s.SetCaret(p, 3, true);
+        var cut = s.Cut();
+        Assert.Equal("bc", cut); Assert.Equal("adef", AllText(d));
+        s.SetCaret(p, 4); s.Type(cut);
+        Assert.Equal("adefbc", AllText(d));
+    }
+
+    [Fact]
+    public void SpaceBetweenParagraphs_UsesLargerOfAfterAndBefore()
+    {
+        var (d, s) = NewDoc();
+        s.Type("a" + (char)10 + "b");
+        var ps = s.Paragraphs();
+        s.SetCaret(ps[0], 0); s.SetSpacing(0, 20);
+        s.SetCaret(ps[1], 0); s.SetSpacing(12, 0);
+        var L = d.Layout();
+        double gap = L.LinesOf(ps[1])[0].Y - (L.LinesOf(ps[0])[0].Y + L.LinesOf(ps[0])[0].Height);
+        Assert.Equal(20, gap, 1);      // max(20, 12), come Word
+    }
 }
