@@ -176,7 +176,7 @@ public partial class MainWindow
         if (q.Length == 0) return;
         var hit = _cmds.FirstOrDefault(c => c.Btn.IsEnabled && c.Label.Contains(q, StringComparison.OrdinalIgnoreCase));
         if (hit.Act != null) { Do(hit.Act); return; }
-        if (!_s.FindNext(q, false)) MessageBox.Show(this, "Nessun comando né testo trovato per \"" + q + "\".", "Cerca");
+        if (!_s.FindNext(q, false)) ThemedDialog.Show(this, "Nessun comando né testo trovato per \"" + q + "\".", "Cerca");
         View.Refresh(true);
     }
 
@@ -361,7 +361,7 @@ public partial class MainWindow
         g.Children.Add(rc);
         g = Group(tl, "Unione");
         var um = new StackPanel();
-        Small(um, "Unisci celle", "merge", () => Do(() => { if (!_s.MergeCells()) MessageBox.Show(this, "Seleziona almeno due celle della stessa tabella (trascina con il mouse).", "Unisci celle"); }));
+        Small(um, "Unisci celle", "merge", () => Do(() => { if (!_s.MergeCells()) ThemedDialog.Show(this, "Seleziona almeno due celle della stessa tabella (trascina con il mouse).", "Unisci celle"); }));
         Stub(um, "Dividi celle", "split"); Stub(um, "Dividi tabella", "split"); g.Children.Add(um);
         g = Group(tl, "Dimensioni cella");
         var dm = new StackPanel(); Stub(dm, "Adatta", "table"); Stub(dm, "Distribuisci righe", "table"); Stub(dm, "Distribuisci colonne", "table"); g.Children.Add(dm);
@@ -385,7 +385,7 @@ public partial class MainWindow
         var d = new FormDialog(this, "Zoom", new FormField("Percentuale (25-400)", ((int)Math.Round(View.Zoom * 100)).ToString()));
         if (d.ShowDialog() != true) return;
         var v = d.Numbers();
-        if (v == null || v[0] < 25 || v[0] > 400) { MessageBox.Show(this, "Valore da 25 a 400.", "Zoom"); return; }
+        if (v == null || v[0] < 25 || v[0] > 400) { ThemedDialog.Show(this, "Valore da 25 a 400.", "Zoom"); return; }
         View.SetZoom(v[0] / 100);
     }
 
@@ -402,9 +402,9 @@ public partial class MainWindow
             new FormField("Maiuscole", f.AllCaps ? "Tutte maiuscole" : f.SmallCaps ? "Maiuscoletto" : "Normale", "Normale", "Tutte maiuscole", "Maiuscoletto"));
         if (d.ShowDialog() != true) return;
         var v = d.Values;
-        if (!double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var size) || size < 1 || size > 1638) { MessageBox.Show(this, "Dimensione non valida (1-1638).", "Carattere"); return; }
+        if (!double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var size) || size < 1 || size > 1638) { ThemedDialog.Show(this, "Dimensione non valida (1-1638).", "Carattere"); return; }
         var col = v[3].Trim().TrimStart('#');
-        if (col.Length != 0 && (col.Length != 6 || !col.All(Uri.IsHexDigit))) { MessageBox.Show(this, "Colore non valido: usa 6 cifre esadecimali.", "Carattere"); return; }
+        if (col.Length != 0 && (col.Length != 6 || !col.All(Uri.IsHexDigit))) { ThemedDialog.Show(this, "Colore non valido: usa 6 cifre esadecimali.", "Carattere"); return; }
         Do(() => _s.Batch(() =>
         {
             _s.SetFont(v[0].Trim()); _s.SetSize(size);

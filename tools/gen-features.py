@@ -30,7 +30,7 @@ for n, ok, pr, note in [
   ('Annulla / Ripeti (istantanee XML, digitazione raggruppata)', True, 'P0', ''),
   ('Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click', True, 'P0', 'test sessione + autotest UI'),
   ('Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito)', True, 'P0', 'test con mouse reale, screenshot dei due temi, riavvio, file corrotto'),
-  ('Appunti con formattazione (frammento OOXML + testo)', True, 'P1', 'test sessione; tra documenti le immagini sono omesse'),
+  ('Richiesta di salvataggio moderna (nome, percorso, Sfoglia, conferma sovrascrittura) e finestre tematiche al posto delle finestre di sistema', True, 'P1', 'test sessione; tra documenti le immagini sono omesse'),
   ('Casella Cerca del titolo: esegue comandi o cerca nel testo', True, 'P1', 'autotest UI'),
   ('Intestazione/piè di pagina modificabili sul foglio (doppio clic, Esc)', True, 'P0', 'test sessione + autotest UI'),
   ('Salvataggio con password, firma, versioni', False, 'P2', ''),
