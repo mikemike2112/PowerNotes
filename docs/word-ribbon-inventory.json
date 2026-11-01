@@ -1,0 +1,631 @@
+{
+    "schede":  [
+                   "Home",
+                   "Inserisci",
+                   "Progettazione",
+                   "Layout",
+                   "Riferimenti",
+                   "Lettere",
+                   "Revisione",
+                   "Visualizza",
+                   "Sviluppo",
+                   "Guida"
+               ],
+    "Home":  {
+                 "Home":  [
+                              "Incolla",
+                              "Taglia",
+                              "Copia",
+                              "Copia formato",
+                              "Appunti di Office...",
+                              "Apri",
+                              "Ingrandisci carattere",
+                              "Riduci carattere",
+                              "Cancella formattazione",
+                              "Grassetto",
+                              "Corsivo",
+                              "Sottolineato",
+                              "Barrato",
+                              "Pedice",
+                              "Apice",
+                              "Colore evidenziatore testo Giallo",
+                              "Colore carattere Rosso",
+                              "Carattere...",
+                              "Elenchi puntati",
+                              "Elenchi numerati",
+                              "Riduci rientro",
+                              "Aumenta rientro",
+                              "Ordina...",
+                              "Mostra tutto",
+                              "Allinea a sinistra",
+                              "Allinea al centro",
+                              "Allinea a destra",
+                              "Giustifica",
+                              "Sfondo RGB(0, 0, 0)",
+                              "Bordi",
+                              "Paragrafo...",
+                              "Stili",
+                              "Stili...",
+                              "Trova",
+                              "Sostituisci...",
+                              "Dettatura",
+                              "Editor",
+                              "Add‑ins",
+                              "Colore evidenziatore testo",
+                              "Colore carattere",
+                              "Sfondo",
+                              "Tipo di carattere",
+                              "Dimensione carattere",
+                              "Altre opzioni",
+                              "Maiuscole/minuscole",
+                              "Effetti testo e tipografia",
+                              "Elenco a più livelli",
+                              "Interlinea e spaziatura paragrafo",
+                              "Seleziona",
+                              "Riservatezza"
+                          ],
+                 "Appunti":  [
+                                 "Incolla",
+                                 "Taglia",
+                                 "Copia",
+                                 "Copia formato",
+                                 "Appunti di Office...",
+                                 "Altre opzioni"
+                             ],
+                 "Carattere":  [
+                                   "Apri",
+                                   "Ingrandisci carattere",
+                                   "Riduci carattere",
+                                   "Cancella formattazione",
+                                   "Grassetto",
+                                   "Corsivo",
+                                   "Sottolineato",
+                                   "Barrato",
+                                   "Pedice",
+                                   "Apice",
+                                   "Colore evidenziatore testo Giallo",
+                                   "Colore carattere Rosso",
+                                   "Carattere...",
+                                   "Colore evidenziatore testo",
+                                   "Colore carattere",
+                                   "Tipo di carattere",
+                                   "Dimensione carattere",
+                                   "Maiuscole/minuscole",
+                                   "Altre opzioni",
+                                   "Effetti testo e tipografia"
+                               ],
+                 "Paragrafo":  [
+                                   "Elenchi puntati",
+                                   "Elenchi numerati",
+                                   "Riduci rientro",
+                                   "Aumenta rientro",
+                                   "Ordina...",
+                                   "Mostra tutto",
+                                   "Allinea a sinistra",
+                                   "Allinea al centro",
+                                   "Allinea a destra",
+                                   "Giustifica",
+                                   "Sfondo RGB(0, 0, 0)",
+                                   "Bordi",
+                                   "Paragrafo...",
+                                   "Sfondo",
+                                   "Altre opzioni",
+                                   "Elenco a più livelli",
+                                   "Interlinea e spaziatura paragrafo"
+                               ],
+                 "Stili":  [
+                               "Stili"
+                           ],
+                 "Modifica":  [
+                                  "Trova",
+                                  "Sostituisci...",
+                                  "Altre opzioni",
+                                  "Seleziona"
+                              ],
+                 "Voce":  [
+                              "Dettatura",
+                              "Altre opzioni"
+                          ],
+                 "Riservatezza":  [
+                                      "Riservatezza"
+                                  ],
+                 "Editor":  [
+                                "Editor"
+                            ],
+                 "Componenti aggiuntivi":  [
+                                               "Add‑ins"
+                                           ]
+             },
+    "Inserisci":  {
+                      "Inserisci":  [
+                                        "Pagina vuota",
+                                        "Interruzione di pagina",
+                                        "Icone",
+                                        "Modelli 3D",
+                                        "SmartArt...",
+                                        "Grafico...",
+                                        "Video online...",
+                                        "Collegamento",
+                                        "Segnalibro...",
+                                        "Riferimento incrociato...",
+                                        "Commento",
+                                        "Riga della firma",
+                                        "Data e ora...",
+                                        "Oggetto...",
+                                        "Equazione",
+                                        "Campi eSignature edizione Standard",
+                                        "Frontespizio",
+                                        "Tabella",
+                                        "Immagini",
+                                        "Forme",
+                                        "Altre opzioni",
+                                        "Schermata",
+                                        "Intestazione",
+                                        "Piè di pagina",
+                                        "Numero di pagina",
+                                        "Casella di testo",
+                                        "Parti rapide",
+                                        "WordArt",
+                                        "Capolettera",
+                                        "Simbolo"
+                                    ],
+                      "Pagine":  [
+                                     "Pagina vuota",
+                                     "Interruzione di pagina",
+                                     "Frontespizio"
+                                 ],
+                      "Tabelle":  [
+                                      "Tabella"
+                                  ],
+                      "Illustrazioni":  [
+                                            "Icone",
+                                            "Modelli 3D",
+                                            "SmartArt...",
+                                            "Grafico...",
+                                            "Immagini",
+                                            "Forme",
+                                            "Altre opzioni",
+                                            "Schermata"
+                                        ],
+                      "Elementi multimediali":  [
+                                                    "Video online..."
+                                                ],
+                      "Collegamenti":  [
+                                           "Collegamento",
+                                           "Segnalibro...",
+                                           "Riferimento incrociato...",
+                                           "Altre opzioni"
+                                       ],
+                      "Commenti":  [
+                                       "Commento"
+                                   ],
+                      "Intestazione e piè di pagina":  [
+                                                           "Intestazione",
+                                                           "Piè di pagina",
+                                                           "Numero di pagina"
+                                                       ],
+                      "Testo":  [
+                                    "Riga della firma",
+                                    "Data e ora...",
+                                    "Oggetto...",
+                                    "Casella di testo",
+                                    "Parti rapide",
+                                    "WordArt",
+                                    "Capolettera",
+                                    "Altre opzioni"
+                                ],
+                      "Simboli":  [
+                                      "Equazione",
+                                      "Altre opzioni",
+                                      "Simbolo"
+                                  ],
+                      "eSignature":  [
+                                         "Campi eSignature edizione Standard"
+                                     ]
+                  },
+    "Progettazione":  {
+                          "Progettazione":  [
+                                                "Set di stili",
+                                                "Imposta come predefinito",
+                                                "Bordi pagina...",
+                                                "Temi",
+                                                "Colori",
+                                                "Tipi di carattere",
+                                                "Spaziatura paragrafo",
+                                                "Effetti",
+                                                "Filigrana",
+                                                "Colore pagina"
+                                            ],
+                          "Formattazione documento":  [
+                                                          "Set di stili",
+                                                          "Imposta come predefinito",
+                                                          "Temi",
+                                                          "Colori",
+                                                          "Tipi di carattere",
+                                                          "Spaziatura paragrafo",
+                                                          "Effetti"
+                                                      ],
+                          "Set di stili":  [
+                                               "Set di stili"
+                                           ],
+                          "Sfondo pagina":  [
+                                                "Bordi pagina...",
+                                                "Filigrana",
+                                                "Colore pagina"
+                                            ]
+                      },
+    "Layout":  {
+                   "Layout":  [
+                                  "Imposta pagina...",
+                                  "Aumenta",
+                                  "Diminuisci",
+                                  "Paragrafo...",
+                                  "Porta avanti",
+                                  "Porta indietro",
+                                  "Riquadro di selezione...",
+                                  "Margini",
+                                  "Orientamento",
+                                  "Dimensioni",
+                                  "Colonne",
+                                  "Interruzioni",
+                                  "Numeri di riga",
+                                  "Sillabazione",
+                                  "Posizione",
+                                  "Testo a capo",
+                                  "Altre opzioni",
+                                  "Allinea",
+                                  "Raggruppa",
+                                  "Ruota"
+                              ],
+                   "Imposta pagina":  [
+                                          "Imposta pagina...",
+                                          "Margini",
+                                          "Orientamento",
+                                          "Dimensioni",
+                                          "Colonne",
+                                          "Interruzioni",
+                                          "Numeri di riga",
+                                          "Sillabazione"
+                                      ],
+                   "Paragrafo":  [
+                                     "Aumenta",
+                                     "Diminuisci",
+                                     "Paragrafo..."
+                                 ],
+                   "Disponi":  [
+                                   "Porta avanti",
+                                   "Porta indietro",
+                                   "Riquadro di selezione...",
+                                   "Posizione",
+                                   "Testo a capo",
+                                   "Altre opzioni",
+                                   "Allinea",
+                                   "Raggruppa",
+                                   "Ruota"
+                               ]
+               },
+    "Riferimenti":  {
+                        "Riferimenti":  [
+                                            "Aggiorna sommario...",
+                                            "Inserisci nota a piè di pagina",
+                                            "Inserisci nota di chiusura",
+                                            "Nota a piè di pagina successiva",
+                                            "Mostra note",
+                                            "Finestra di dialogo Note a piè di pagina e di chiusura...",
+                                            "Gestisci fonti...",
+                                            "Apri",
+                                            "Inserisci didascalia...",
+                                            "Inserisci indice delle figure...",
+                                            "Aggiorna tabella",
+                                            "Riferimento incrociato...",
+                                            "Segna voce...",
+                                            "Inserisci indice...",
+                                            "Aggiorna indice",
+                                            "Segna citazione...",
+                                            "Inserisci indice delle fonti...",
+                                            "Stile",
+                                            "Sommario",
+                                            "Aggiungi testo",
+                                            "Altre opzioni",
+                                            "Inserisci citazione",
+                                            "Bibliografia",
+                                            "Cambia provider"
+                                        ],
+                        "Sommario":  [
+                                         "Aggiorna sommario...",
+                                         "Sommario",
+                                         "Aggiungi testo"
+                                     ],
+                        "Note a piè di pagina":  [
+                                                     "Inserisci nota a piè di pagina",
+                                                     "Inserisci nota di chiusura",
+                                                     "Nota a piè di pagina successiva",
+                                                     "Mostra note",
+                                                     "Finestra di dialogo Note a piè di pagina e di chiusura...",
+                                                     "Altre opzioni"
+                                                 ],
+                        "Citazioni e bibliografia":  [
+                                                         "Gestisci fonti...",
+                                                         "Apri",
+                                                         "Stile",
+                                                         "Inserisci citazione",
+                                                         "Bibliografia",
+                                                         "Cambia provider"
+                                                     ],
+                        "Didascalie":  [
+                                           "Inserisci didascalia...",
+                                           "Inserisci indice delle figure...",
+                                           "Aggiorna tabella",
+                                           "Riferimento incrociato..."
+                                       ],
+                        "Indice":  [
+                                       "Segna voce...",
+                                       "Inserisci indice...",
+                                       "Aggiorna indice"
+                                   ],
+                        "Indice delle fonti":  [
+                                                   "Segna citazione...",
+                                                   "Inserisci indice delle fonti...",
+                                                   "Aggiorna tabella"
+                                               ]
+                    },
+    "Lettere":  {
+                    "Lettere":  [
+                                    "Buste...",
+                                    "Etichette...",
+                                    "Modifica elenco destinatari...",
+                                    "Evidenzia campi unione",
+                                    "Blocco di indirizzi...",
+                                    "Formula di apertura...",
+                                    "Inserisci campo unione",
+                                    "Corrispondenza campi...",
+                                    "Aggiorna etichette",
+                                    "Anteprima risultati",
+                                    "Primo",
+                                    "Precedente",
+                                    "Successivo",
+                                    "Ultimo",
+                                    "Trova destinatario...",
+                                    "Controllo errori...",
+                                    "Inizia stampa unione",
+                                    "Seleziona destinatari",
+                                    "Altre opzioni",
+                                    "Regole",
+                                    "Finalizza e unisci",
+                                    "Record"
+                                ],
+                    "Crea":  [
+                                 "Buste...",
+                                 "Etichette..."
+                             ],
+                    "Inizia stampa unione":  [
+                                                 "Modifica elenco destinatari...",
+                                                 "Inizia stampa unione",
+                                                 "Seleziona destinatari"
+                                             ],
+                    "Inserisci campi":  [
+                                            "Evidenzia campi unione",
+                                            "Blocco di indirizzi...",
+                                            "Formula di apertura...",
+                                            "Inserisci campo unione",
+                                            "Corrispondenza campi...",
+                                            "Aggiorna etichette",
+                                            "Altre opzioni",
+                                            "Regole"
+                                        ],
+                    "Anteprima risultati":  [
+                                                "Anteprima risultati",
+                                                "Primo",
+                                                "Precedente",
+                                                "Successivo",
+                                                "Ultimo",
+                                                "Trova destinatario...",
+                                                "Controllo errori...",
+                                                "Record"
+                                            ],
+                    "Fine":  [
+                                 "Finalizza e unisci"
+                             ]
+                },
+    "Revisione":  {
+                      "Revisione":  [
+                                        "Apri",
+                                        "Riquadro delle revisioni",
+                                        "Opzioni rilevamento modifiche...",
+                                        "Visualizza per revisione",
+                                        "Filtra tutti i markup",
+                                        "Mostra commenti",
+                                        "Altre opzioni"
+                                    ],
+                      "Strumenti di correzione":  [
+                                                      "Editor",
+                                                      "Ortografia e Grammatica",
+                                                      "Thesaurus...",
+                                                      "Conteggio parole",
+                                                      "Altre opzioni"
+                                                  ],
+                      "Comandi vocali":  [
+                                             "Leggi ad alta voce"
+                                         ],
+                      "Accessibilità":  [
+                                            "Verifica accessibilità",
+                                            "Altre opzioni"
+                                        ],
+                      "Lingua":  [
+                                     "Lingua"
+                                 ],
+                      "Commenti":  [
+                                       "Nuovo commento",
+                                       "Elimina",
+                                       "Precedente",
+                                       "Successivo",
+                                       "Mostra commenti",
+                                       "Altre opzioni"
+                                   ],
+                      "Rilevamento modifiche":  [
+                                                    "Rilevamento modifiche"
+                                                ],
+                      "Confronta":  [
+                                        "Confronta"
+                                    ],
+                      "Proteggi":  [
+                                       "Proteggi"
+                                   ],
+                      "Input penna":  [
+                                          "Nascondi input penna",
+                                          "Altre opzioni"
+                                      ]
+                  },
+    "Visualizza":  {
+                       "Visualizza":  [
+                                          "Modalità di lettura",
+                                          "Layout di stampa",
+                                          "Layout Web",
+                                          "Struttura",
+                                          "Bozza",
+                                          "Focus",
+                                          "Strumento di lettura immersiva",
+                                          "Verticale",
+                                          "Orizzontale",
+                                          "Zoom...",
+                                          "100%",
+                                          "Una pagina",
+                                          "Più pagine",
+                                          "Larghezza pagina",
+                                          "Nuova finestra",
+                                          "Disponi tutto",
+                                          "Dividi",
+                                          "Affianca",
+                                          "Scorrimento sincrono",
+                                          "Reimposta posizione finestra",
+                                          "Visualizza macro",
+                                          "Proprietà",
+                                          "Macro",
+                                          "Righello",
+                                          "Griglia",
+                                          "Riquadro di spostamento",
+                                          "Cambia finestra",
+                                          "Altre opzioni"
+                                      ],
+                       "Visualizzazioni":  [
+                                               "Modalità di lettura",
+                                               "Layout di stampa",
+                                               "Layout Web",
+                                               "Struttura",
+                                               "Bozza"
+                                           ],
+                       "Immersiva":  [
+                                         "Focus",
+                                         "Strumento di lettura immersiva"
+                                     ],
+                       "Spostamento tra pagine":  [
+                                                      "Verticale",
+                                                      "Orizzontale"
+                                                  ],
+                       "Mostra":  [
+                                      "Righello",
+                                      "Griglia",
+                                      "Riquadro di spostamento"
+                                  ],
+                       "Zoom":  [
+                                    "Zoom...",
+                                    "100%",
+                                    "Una pagina",
+                                    "Più pagine",
+                                    "Larghezza pagina"
+                                ],
+                       "Finestra":  [
+                                        "Nuova finestra",
+                                        "Disponi tutto",
+                                        "Dividi",
+                                        "Affianca",
+                                        "Scorrimento sincrono",
+                                        "Reimposta posizione finestra",
+                                        "Cambia finestra"
+                                    ],
+                       "Macro":  [
+                                     "Visualizza macro",
+                                     "Macro",
+                                     "Altre opzioni"
+                                 ],
+                       "SharePoint":  [
+                                          "Proprietà"
+                                      ]
+                   },
+    "Sviluppo":  {
+                     "Sviluppo":  [
+                                      "Visual Basic",
+                                      "Macro",
+                                      "Registra macro...",
+                                      "Sospendi registrazione",
+                                      "Sicurezza macro",
+                                      "Componenti aggiuntivi",
+                                      "Componenti aggiuntivi di Word...",
+                                      "Componenti aggiuntivi COM...",
+                                      "Controllo contenuto RTF",
+                                      "Controllo contenuto testo normale",
+                                      "Controllo contenuto immagine",
+                                      "Controllo contenuto raccolta blocchi predefiniti",
+                                      "Controllo contenuto di tipo casella di controllo",
+                                      "Controllo contenuto casella combinata",
+                                      "Controllo contenuto casella di riepilogo a discesa",
+                                      "Controllo contenuto Selezione data",
+                                      "Controllo contenuto sezione ripetuta",
+                                      "Modalità progettazione",
+                                      "Proprietà",
+                                      "Riquadro mapping XML",
+                                      "Blocca autori",
+                                      "Limita modifica",
+                                      "Modello di documento",
+                                      "Strumenti legacy",
+                                      "Raggruppa",
+                                      "Altre opzioni"
+                                  ],
+                     "Codice":  [
+                                    "Visual Basic",
+                                    "Macro",
+                                    "Registra macro...",
+                                    "Sospendi registrazione",
+                                    "Sicurezza macro"
+                                ],
+                     "Componenti aggiuntivi":  [
+                                                   "Componenti aggiuntivi",
+                                                   "Componenti aggiuntivi di Word...",
+                                                   "Componenti aggiuntivi COM..."
+                                               ],
+                     "Controlli":  [
+                                       "Controllo contenuto RTF",
+                                       "Controllo contenuto testo normale",
+                                       "Controllo contenuto immagine",
+                                       "Controllo contenuto raccolta blocchi predefiniti",
+                                       "Controllo contenuto di tipo casella di controllo",
+                                       "Controllo contenuto casella combinata",
+                                       "Controllo contenuto casella di riepilogo a discesa",
+                                       "Controllo contenuto Selezione data",
+                                       "Controllo contenuto sezione ripetuta",
+                                       "Modalità progettazione",
+                                       "Proprietà",
+                                       "Strumenti legacy",
+                                       "Raggruppa"
+                                   ],
+                     "Mapping":  [
+                                     "Riquadro mapping XML"
+                                 ],
+                     "Proteggi":  [
+                                      "Blocca autori",
+                                      "Limita modifica",
+                                      "Altre opzioni"
+                                  ],
+                     "Modelli":  [
+                                     "Modello di documento"
+                                 ]
+                 },
+    "Guida":  {
+                  "Guida":  [
+                                "Guida",
+                                "Feedback",
+                                "Mostra formazione",
+                                "Novità"
+                            ]
+              }
+}

@@ -11,6 +11,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Product>PowerNotes</Product>
+    <ApplicationIcon>Assets\powernotes.ico</ApplicationIcon>
+    <AssemblyName>PowerNotes</AssemblyName>
+    <RootNamespace>PowerNotes.App</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\powernotes.ico" />
+  </ItemGroup>
 
 </Project>

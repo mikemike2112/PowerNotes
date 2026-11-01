@@ -372,10 +372,10 @@ public sealed class EditorSession
     public RunFmt FormatAtCaret()
     {
         var p = Caret.P;
-        Styles.ResolvePara(p, null, out var mark);
+        Styles.ResolvePara(p, null, out var mark, out var baseRun);
         var leaves = ParaText.Leaves(p);
         var leaf = leaves.LastOrDefault(l => l.Start < Caret.Off) ?? leaves.FirstOrDefault();
-        var fmt = leaf == null ? mark : Styles.ResolveRun(mark, leaf.Run);
+        var fmt = leaf == null ? mark : Styles.ResolveRun(baseRun, leaf.Run);
         if (Pending != null) { fmt = fmt.Clone(); Styles.ApplyRPr(fmt, Pending); }
         return fmt;
     }
@@ -389,7 +389,7 @@ public sealed class EditorSession
         var (s, e) = Range; bool any = false;
         foreach (var p in SelectedParagraphs())
         {
-            Styles.ResolvePara(p, null, out var mark);
+            Styles.ResolvePara(p, null, out _, out var mark);
             int a = p == s.P ? s.Off : 0, b = p == e.P ? e.Off : ParaText.Length(p);
             foreach (var l in ParaText.Leaves(p).Where(l => l.End > a && l.Start < b))
             {
