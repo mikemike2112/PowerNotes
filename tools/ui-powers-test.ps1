@@ -78,8 +78,7 @@ function Toggle-State($el) { $el.GetCurrentPattern([System.Windows.Automation.To
 if (Test-Path $settings) { Remove-Item $settings }
 $app = Start-App
 try {
-    Click-Real (Find-ByName $app.Win 'Powers')
-    $sw = Find-ByName $app.Win 'Modalità scura'
+    $sw = Open-Powers $app
     $res.firstRunState = Toggle-State $sw
     Shot $app.Win (Join-Path $OutDir 'powers-scuro.png')
     for ($k = 0; $k -lt 6; $k++) {

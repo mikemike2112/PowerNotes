@@ -469,3 +469,102 @@ public class ClipboardTests
         Assert.Equal("AB", string.Join("\n", d2.Paragraphs().Select(ParaText.Text)));
     }
 }
+
+public class HeaderFooterOnPageTests
+{
+    [Fact]
+    public void EditHeaderDirectlyOnPage_TypeUndoExit()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type("corpo");
+        var body = s.Paragraphs()[0];
+        s.EnterHeaderFooter(true);                     // crea l'intestazione se manca
+        Assert.True(s.EditingHF);
+        s.Type("Testata");
+        Assert.Equal("Testata", s.GetHeaderFooterTextFromStory());
+        var lay = d.Layout();
+        var hl = lay.Pages[0].Lines.Single(l => l.Story == PowerNotes.Core.Layout.Story.Header);
+        Assert.True(lay.HitTest(0, hl.Left + 3, hl.Y + 2, true) is { } h && h.Para == s.Caret.P);
+        Assert.Equal(body, lay.HitTest(0, 100, 200, false)!.Value.Para);   // fuori modalità: solo corpo
+        s.ExitHeaderFooter();
+        Assert.False(s.EditingHF); Assert.Same(body, s.Caret.P);
+        var path = Path.Combine(Path.GetTempPath(), "pn-hf2-" + Guid.NewGuid().ToString("N") + ".docx");
+        try { d.Save(path); using var pk = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(path, false); Assert.Empty(new DocumentFormat.OpenXml.Validation.OpenXmlValidator(DocumentFormat.OpenXml.FileFormatVersions.Office2019).Validate(pk)); }
+        finally { File.Delete(path); }
+    }
+}
+
+public class TableStyleAndFontTests
+{
+    [Fact]
+    public void RepeatedHeaderRows_AppearOnEveryPage()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.InsertTable(90, 2);
+        var rows = d.Body.Descendants<TableRow>().ToList();
+        s.SetCaret(rows[0].Descendants<Paragraph>().First(), 0); s.Type("INTESTAZIONE");
+        rows[0].TableRowProperties = new TableRowProperties(new TableHeader());
+        var lay = d.Layout();
+        Assert.True(lay.Pages.Count >= 2);
+        for (int i = 0; i < lay.Pages.Count; i++) Assert.Contains(lay.Pages[i].Lines, l => l.Segs.Any(x => x.Text.Contains("INTESTAZIONE")));
+    }
+
+    [Fact]
+    public void ConditionalTableStyle_FirstRowShadingAndBold()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        var styles = d.Pkg.MainDocumentPart!.StyleDefinitionsPart!.Styles!;
+        styles.Append(new Style("<w:style xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" w:type=\"table\" w:styleId=\"TS\"><w:name w:val=\"TS\"/><w:basedOn w:val=\"TableNormal\"/><w:tblStylePr w:type=\"firstRow\"><w:rPr><w:b/></w:rPr><w:tcPr><w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FF0000\"/></w:tcPr></w:tblStylePr><w:tblStylePr w:type=\"band2Horz\"><w:tcPr><w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"00FF00\"/></w:tcPr></w:tblStylePr></w:style>"));
+        s.InsertTable(3, 2);
+        var tbl = d.Body.Descendants<Table>().First();
+        tbl.GetFirstChild<TableProperties>()!.TableStyle!.Val = "TS";
+        s.SetCaret(tbl.Descendants<Paragraph>().First(), 0); s.Type("Titolo");
+        var lay = d.Layout();
+        Assert.Contains(lay.Pages[0].Prims.OfType<PowerNotes.Core.Layout.RectPrim>(), r => r.Fill == "FF0000");
+        Assert.Contains(lay.Pages[0].Prims.OfType<PowerNotes.Core.Layout.RectPrim>(), r => r.Fill == "00FF00");
+        Assert.True(lay.Pages[0].Prims.OfType<PowerNotes.Core.Layout.TextPrim>().First(t => t.Text == "Titolo").Fmt.Bold);
+    }
+
+    [Fact]
+    public void SyntheticBold_Detected_And_TtcFontsEmbedInPdf()
+    {
+        Assert.False(PowerNotes.Core.Fonts.FontCatalog.HasExact("Calibri Light", true, false));
+        Assert.True(PowerNotes.Core.Fonts.FontCatalog.HasExact("Arial", true, false));
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type("Testo in Cambria"); s.SelectAll(); s.SetFont("Cambria");
+        var bytes = PowerNotes.Core.Pdf.PdfExporter.Export(d.Layout(), "ttc");
+        Assert.Contains("Cambria", System.Text.Encoding.Latin1.GetString(bytes));
+    }
+}
+
+public class FloatingObjectTests
+{
+    [Fact]
+    public void TextBoxFromWord_IsDrawn()
+    {
+        using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, "shape-textbox.docx"));
+        var lay = d.Layout();
+        Assert.Contains(lay.Pages[0].Prims.OfType<PowerNotes.Core.Layout.TextPrim>(), t => t.Text.Contains("casella"));
+    }
+
+    [Fact]
+    public void AnchoredImage_IsPlacedAtPageOffset()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        var png = Path.Combine(Path.GetTempPath(), "pn-fl-" + Guid.NewGuid().ToString("N") + ".png");
+        File.WriteAllBytes(png, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYEJRABCAAUEAQHBXQbyAAAAAElFTkSuQmCC"));
+        try
+        {
+            s.Type("x"); s.InsertImage(png);
+            var dr = d.Body.Descendants<Drawing>().First();
+            var xml = dr.OuterXml.Replace("<wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">", "<wp:anchor distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\" simplePos=\"0\" relativeHeight=\"1\" behindDoc=\"0\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/><wp:positionH relativeFrom=\"page\"><wp:posOffset>1270000</wp:posOffset></wp:positionH><wp:positionV relativeFrom=\"page\"><wp:posOffset>2540000</wp:posOffset></wp:positionV>")
+                .Replace("</wp:inline>", "</wp:anchor>").Replace("<wp:cNvGraphicFramePr>", "<wp:wrapNone/><wp:cNvGraphicFramePr>");
+            xml = xml.Replace("<wp:wrapNone/><wp:cNvGraphicFramePr>", "<wp:cNvGraphicFramePr>");
+            xml = xml.Replace("<wp:docPr", "<wp:wrapNone/><wp:docPr");
+            dr.Parent!.ReplaceChild(new Drawing(xml), dr);
+            var img = d.Layout().Pages[0].Prims.OfType<PowerNotes.Core.Layout.ImagePrim>().Single();
+            Assert.Equal(100, img.X, 1); Assert.Equal(200, img.Y, 1);
+        }
+        finally { File.Delete(png); }
+    }
+}

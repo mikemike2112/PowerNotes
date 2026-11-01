@@ -940,6 +940,9 @@ public sealed class EditorSession
         Changed();
     }
 
+    /// <summary>Testo della storia (intestazione/piè) in modifica.</summary>
+    public string GetHeaderFooterTextFromStory() => _storyRoot == null ? "" : string.Join(((char)10).ToString(), _storyRoot.Elements<Paragraph>().Select(ParaText.Text));
+
     public string GetHeaderFooterText(bool header)
     {
         var sp = SectionFor(Caret.P);

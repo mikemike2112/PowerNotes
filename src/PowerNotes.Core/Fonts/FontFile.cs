@@ -96,6 +96,26 @@ public sealed class FontFile
         }
     }
 
+    /// <summary>Estrae un font singolo da una collezione .ttc (per incorporarlo nel PDF): ricostruisce la tabella delle tabelle con nuovi offset.</summary>
+    public static byte[] ExtractFromCollection(string path, int index)
+    {
+        var d = File.ReadAllBytes(path);
+        uint U32(int o) => BinaryPrimitives.ReadUInt32BigEndian(d.AsSpan(o));
+        int off = U32(0) == 0x74746366 ? (int)U32(12 + 4 * index) : 0;
+        int n = BinaryPrimitives.ReadUInt16BigEndian(d.AsSpan(off + 4));
+        var tabs = Enumerable.Range(0, n).Select(i => { int e = off + 12 + 16 * i; return (Tag: U32(e), Sum: U32(e + 4), Off: (int)U32(e + 8), Len: (int)U32(e + 12)); }).OrderBy(t => t.Tag).ToList();
+        using var ms = new MemoryStream();
+        void W32(uint v) { Span<byte> b = stackalloc byte[4]; BinaryPrimitives.WriteUInt32BigEndian(b, v); ms.Write(b); }
+        ms.Write(d, off, 4);                       // sfntVersion
+        Span<byte> hdr = stackalloc byte[8]; d.AsSpan(off + 4, 8).CopyTo(hdr); ms.Write(hdr);   // numTables, searchRange, entrySelector, rangeShift
+        int pos = 12 + 16 * n;
+        var offs = new List<int>();
+        foreach (var t in tabs) { offs.Add(pos); pos += (t.Len + 3) & ~3; }
+        for (int i = 0; i < n; i++) { W32(tabs[i].Tag); W32(tabs[i].Sum); W32((uint)offs[i]); W32((uint)tabs[i].Len); }
+        for (int i = 0; i < n; i++) { ms.Write(d, tabs[i].Off, tabs[i].Len); for (int k = tabs[i].Len; k < ((tabs[i].Len + 3) & ~3); k++) ms.WriteByte(0); }
+        return ms.ToArray();
+    }
+
     public bool HasGlyph(int cp) => _cmap.ContainsKey(cp);
 
     /// <summary>Avanzamento di un code point in em.</summary>

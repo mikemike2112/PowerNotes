@@ -70,6 +70,16 @@ public static class FontCatalog
         }
     }
 
+    /// <summary>True se esiste esattamente la variante richiesta (altrimenti grassetto/corsivo vanno sintetizzati).</summary>
+    public static bool HasExact(string family, bool bold, bool italic)
+    {
+        lock (Cache)
+        {
+            if (!Map.ContainsKey(Key(family, false, false))) ScanCloud(family);
+            return Map.ContainsKey(Key(family, bold, italic)) || !Map.ContainsKey(Key(family, false, false));   // famiglia assente → ripiego Arial con varianti proprie
+        }
+    }
+
     /// <summary>File del font che verrà usato per (famiglia, stile): con ripiego su stile base e poi su Arial.</summary>
     public static Entry? Resolve(string family, bool bold, bool italic)
     {
