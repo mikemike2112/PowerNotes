@@ -34,6 +34,9 @@ Confrontate a vista 10 file (`mixed-report`, `styles-headings`, `text-formatting
 - Il grassetto di font senza variante Bold installata (es. Calibri Light) non è sintetizzato: resta regolare.
 - `table-merged-cells` dopo la correzione dei RowSpan coincide con Word a vista.
 
+## Finestre di dialogo
+Le finestre proprie (salvataggio, avvisi, Uniforma, Scudo privacy) non sono più finestre trasparenti con effetto d'ombra: causa della resa sgranata. Una finestra con `AllowsTransparency` è «layered» e un `DropShadowEffect` è renderizzato dal software su bitmap: il testo perde ClearType e a scala Windows >100% (qui 125%) viene riscalato. Ora si usa una finestra normale con cornice DWM (ombra e angoli arrotondati del sistema). Verificato con cattura dello schermo vero a 125%.
+
 ## Limiti noti (non implementato o semplificato)
 - Spaziatura carattere e kerning/legature ignorati (larghezze da `hmtx`): ±1% sulle lunghezze di riga, nessuna differenza di conta pagine nel corpus.
 - Oggetti ancorati: immagini e caselle di testo sono **disegnate** alla posizione indicata (pagina, margine, paragrafo; allineamenti); il testo non scorre attorno (`wrapSquare/Tight`), mentre "sopra e sotto" riserva lo spazio solo se ancorato al paragrafo. Forme vettoriali e rotazioni non disegnate (restano nel file).

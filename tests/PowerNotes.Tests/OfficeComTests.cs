@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using PowerNotes.Core.Edit;
 using PowerNotes.Core.Model;
+using PowerNotes.Core.Privacy;
 
 namespace PowerNotes.Tests;
 
@@ -46,6 +47,18 @@ public sealed class OfficeFixture : IDisposable
                 files.Add(mod);
             }
         }
+        // Uniforma e Scudo privacy: i file prodotti devono aprirsi in Word senza ripristino e con lo stesso testo
+        foreach (var n in new[] { "text-formatting", "mixed-report", "table-borders-shading" })
+        {
+            var u = Path.Combine(Dir, n + ".uniform.docx");
+            using (var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, n + ".docx"))) { new EditorSession(d).Uniform(); d.Save(u); }
+            files.Add(u);
+        }
+        var sample = PrivacySample.Build(); var samplePath = Path.Combine(Dir, "privacy-sample.docx"); File.WriteAllBytes(samplePath, sample); files.Add(samplePath);
+        var cleaned = PrivacyShield.Clean(sample, PrivacyShield.Scan(sample).Findings.Select(f => f.Id).ToHashSet()).Copy;
+        File.WriteAllBytes(Path.Combine(Dir, "privacy-clean.docx"), cleaned); files.Add(Path.Combine(Dir, "privacy-clean.docx"));
+        var cleanedRm = PrivacyShield.Clean(sample, PrivacyShield.Scan(sample).Findings.Select(f => f.Id).ToHashSet(), CommentMode.Remove).Copy;
+        File.WriteAllBytes(Path.Combine(Dir, "privacy-clean-rm.docx"), cleanedRm); files.Add(Path.Combine(Dir, "privacy-clean-rm.docx"));
         // controlli negativi: il rilevatore DEVE fallire su questi
         var baseFile = Path.Combine(TestPaths.Corpus, "table-simple.docx");
         MakeBad("neg-xml-rotto", baseFile, z => Write(z, "word/document.xml", "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>rotto</w:r></w:p></w:body>"), files);
@@ -130,6 +143,26 @@ public class OfficeComTests(OfficeFixture fx)
         Assert.Equal(expected, m.GetProperty("text").GetString());
         foreach (var k in new[] { "tables", "inlineShapes", "sections" })
             Assert.Equal(o.GetProperty(k).GetInt32(), m.GetProperty(k).GetInt32());
+    }
+
+    [Theory, InlineData("text-formatting"), InlineData("mixed-report"), InlineData("table-borders-shading")]
+    public void Uniform_OpensInWordWithSameText(string name)
+    {
+        var o = R(name + ".docx"); var u = R(name + ".uniform.docx");
+        Assert.True(u.GetProperty("ok").GetBoolean(), "file uniformato non si apre in Word: " + u.GetProperty("error"));
+        Assert.Equal(o.GetProperty("text").GetString(), u.GetProperty("text").GetString());
+        foreach (var k in new[] { "tables", "inlineShapes", "sections" }) Assert.Equal(o.GetProperty(k).GetInt32(), u.GetProperty(k).GetInt32());
+    }
+
+    [Theory, InlineData("privacy-clean"), InlineData("privacy-clean-rm")]
+    public void PrivacyCopy_OpensInWordWithoutRepair_SameBodyText_AuthorsGone(string file)
+    {
+        var o = R("privacy-sample.docx"); var c = R(file + ".docx");
+        Assert.True(o.GetProperty("ok").GetBoolean(), "campione non si apre: " + o.GetProperty("error"));
+        Assert.True(c.GetProperty("ok").GetBoolean(), "copia pulita non si apre in Word: " + c.GetProperty("error"));
+        Assert.Equal(o.GetProperty("text").GetString(), c.GetProperty("text").GetString());   // stesso contenuto (revisione inserita compresa)
+        Assert.NotEqual(PrivacySample.Mario, c.GetProperty("author").GetString());
+        Assert.DoesNotContain(PrivacySample.Luisa, c.GetProperty("lastAuthor").GetString());
     }
 
     [Fact]
