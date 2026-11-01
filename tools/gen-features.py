@@ -16,6 +16,7 @@ DONE = {  # comando -> nota (implementato E coperto da test)
 }
 P0 = set(DONE) | {'Annulla', 'Ripeti'}
 P1 = {'Cancella formattazione','Mostra tutto','Sfondo','Bordi','Seleziona','Pagina vuota','Collegamento','Segnalibro...','Inserisci nota a piè di pagina','Conteggio parole','Ortografia e Grammatica','Rilevamento modifiche','Nuovo commento','Colonne','Interruzioni','Larghezza pagina','Una pagina','Righello','Sommario','Copia formato','Maiuscole/minuscole','Ordina...','Sillabazione','Numeri di riga','Casella di testo','Forme','Simbolo','Equazione','Commento'}
+REMOVED = {'Frontespizio','Modelli 3D','Schermata','Grafico...','Grafico','SmartArt...','SmartArt','Riferimento incrociato','Riferimento incrociato...','Casella di testo','Sillabazione','Layout Web','Struttura','Bozza'}   # tolte dall'interfaccia (nuova direzione: poche voci che funzionano)
 out = io.StringIO()
 w = lambda s='': out.write(s + '\n')
 w('# Funzionalità')
@@ -32,6 +33,9 @@ for n, ok, pr, note in [
   ('Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito)', True, 'P0', 'test con mouse reale, screenshot dei due temi, riavvio, file corrotto'),
   ('Richiesta di salvataggio moderna (nome, percorso, Sfoglia, conferma sovrascrittura) e finestre tematiche al posto delle finestre di sistema', True, 'P1', 'test sessione; tra documenti le immagini sono omesse'),
   ('Casella Cerca del titolo: esegue comandi o cerca nel testo', True, 'P1', 'autotest UI'),
+  ('Powers · Uniforma: toglie font, dimensione, colore, evidenziazione e sfondo diretti (selezione o corpo), anteprima con conteggio, un solo annulla', True, 'P1', 'test Core su 5 file del corpus + riapertura in Word'),
+  ('Powers · Scudo privacy: analizza autori, società, proprietà, commenti/revisioni, persone, percorsi, miniatura; crea una copia ripulita e la ricontrolla; elenca gli avvisi', True, 'P1', 'test: dati noti assenti in ogni parte, originale identico byte per byte, copia valida e aperta da Word'),
+  ('Pulsante ingrandisci/ripristina con icona e tooltip a seconda dello stato; ribbon adattivo (gruppi compatti, poi menu «⋯»)', True, 'P0', 'autotest UI + screenshot a 1500/1100/800/700 px'),
   ('Intestazione/piè di pagina modificabili sul foglio (doppio clic, Esc)', True, 'P0', 'test sessione + autotest UI'),
   ('Salvataggio con password, firma, versioni', False, 'P2', ''),
 ]:
@@ -43,6 +47,7 @@ for tab in inv['schede']:
         if g == tab: continue
         w(); w(f'### {g}')
         for it in items:
+            if it in REMOVED: continue
             if it in ('Altre opzioni', 'Apri') or it.startswith('Colore evidenziatore testo ') or it.startswith('Colore carattere ') or it.startswith('Sfondo RGB'): continue
             ok = it in DONE
             pr = 'P0' if it in P0 else 'P1' if it in P1 else 'P2'

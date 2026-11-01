@@ -584,3 +584,60 @@ public class BatchTests
         Assert.Equal("abc", string.Join("", d.Paragraphs().Select(ParaText.Text)));
     }
 }
+
+public class UniformTests
+{
+    static int Count<T>(WordDoc d) where T : DocumentFormat.OpenXml.OpenXmlElement => d.Body.Descendants<T>().Count();
+
+    [Theory, InlineData("text-formatting"), InlineData("mixed-report"), InlineData("hyperlink"), InlineData("image-inline"), InlineData("table-borders-shading")]
+    public void Uniform_KeepsTextEmphasisAndStructure_RemovesDirectLooks_OneUndo_Valid(string name)
+    {
+        using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, name + ".docx")); var s = new EditorSession(d);
+        string Text() => string.Join("\n", d.Paragraphs().Select(ParaText.Text));
+        var text = Text(); int b = Count<Bold>(d), i = Count<Italic>(d), u = Count<Underline>(d), sup = Count<VerticalTextAlignment>(d), links = Count<Hyperlink>(d), draws = Count<Drawing>(d), tbls = Count<Table>(d);
+        var prev = s.PreviewUniform();
+        Assert.Equal(text, Text());                                // l'anteprima non modifica nulla
+        var r = s.Uniform();
+        Assert.Equal(prev, r);                                      // l'anteprima coincide con l'esito
+        Assert.Equal(text, Text());
+        Assert.Equal((b, i, u, sup, links, draws, tbls), (Count<Bold>(d), Count<Italic>(d), Count<Underline>(d), Count<VerticalTextAlignment>(d), Count<Hyperlink>(d), Count<Drawing>(d), Count<Table>(d)));
+        // nessun aspetto diretto residuo fuori dai paragrafi lasciati intenzionalmente
+        foreach (var p in d.Paragraphs())
+        {
+            if (p.ParagraphProperties?.ParagraphStyleId == null && p.Descendants<RunProperties>().Any(x => x.FontSize != null) && r.Left > 0) continue;
+            Assert.DoesNotContain(p.Descendants<RunProperties>(), x => x.RunFonts != null || x.Color != null || x.Highlight != null || x.Shading != null);
+        }
+        if (r.Runs > 0) { Assert.True(d.Layout().Pages.Count >= 1); s.Undo(); Assert.NotEqual(0, d.Body.Descendants<RunProperties>().Count(x => x.RunFonts != null || x.Color != null || x.Highlight != null)); }
+        Assert.Equal(text, Text());
+    }
+
+    [Fact]
+    public void Uniform_OnlySelection_AndFontBecomesStyleFont()
+    {
+        using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, "text-formatting.docx")); var s = new EditorSession(d);
+        var ps = d.Paragraphs();
+        s.SetCaret(ps[1], 0); s.SetCaret(ps[1], 10, true);          // solo i primi 10 caratteri del 2° paragrafo
+        var r = s.Uniform();
+        Assert.True(r.Runs >= 1);
+        s.SetCaret(ps[1], 5); Assert.Equal("Aptos", s.FormatAtCaret().Font);
+        s.SetCaret(ps[1], 30); Assert.Equal("Arial", s.FormatAtCaret().Font);          // fuori selezione: invariato
+        s.ClearSel();
+        s.SetCaret(ps[0], 0);
+        var all = s.Uniform();                                          // senza selezione: tutto il corpo
+        s.SetCaret(ps[1], 30); Assert.Equal("Aptos", s.FormatAtCaret().Font);
+    }
+
+    [Fact]
+    public void HeadingLikeParagraphWithoutStyle_IsLeftAlone()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type("Titolo finto\ncorpo"); var ps = s.Paragraphs();
+        s.SetCaret(ps[0], 0); s.SetCaret(ps[0], 5, true); s.SelectAll(); s.SetCaret(ps[0], 0); s.SetCaret(ps[0], 12, true); s.ToggleBold(); s.SetSize(24);
+        s.SetCaret(ps[1], 0); s.SetCaret(ps[1], 5, true); s.SetFont("Courier New");
+        s.SetCaret(ps[1], 0);
+        var r = s.Uniform();
+        Assert.Equal(1, r.Left);
+        s.SetCaret(ps[0], 3); Assert.Equal(24, s.FormatAtCaret().Size);
+        s.SetCaret(ps[1], 3); Assert.NotEqual("Courier New", s.FormatAtCaret().Font);
+    }
+}

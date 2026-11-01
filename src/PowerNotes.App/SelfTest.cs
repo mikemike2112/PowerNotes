@@ -143,6 +143,18 @@ static class SelfTest
         Check(ParaText.Text(w.Session.Paragraphs()[^1]).StartsWith(Clipboard.GetText()), "incolla dagli appunti di Windows");
         // finestra Carattere: stesso effetto del dialogo applicato in un'unica azione di annullamento
         s.SetCaret(pc, 0); s.SetCaret(pc, 4, true);
+        // pulsante ingrandisci: icona e tooltip seguono lo stato della finestra
+        w.WindowState = WindowState.Maximized; await Idle();
+        var mx = Find<ButtonBase>(w, x => System.Windows.Automation.AutomationProperties.GetName(x) is "Ripristina giù" or "Ingrandisci")!;
+        Check(System.Windows.Automation.AutomationProperties.GetName(mx) == "Ripristina giù", "a schermo intero il pulsante diventa «Ripristina giù»");
+        w.WindowState = WindowState.Normal; await Idle();
+        Check(System.Windows.Automation.AutomationProperties.GetName(mx) == "Ingrandisci", "a finestra il pulsante torna «Ingrandisci»");
+        // ribbon adattivo: a larghezza ridotta i gruppi si compattano o passano nel menu
+        w.Width = 760; w.SelectTab(0); await Idle(); await Idle();
+        var bar = Find<RibbonBar>(w, _ => true)!;
+        Check(bar.CompactCount > 0 || bar.OverflowCount > 0, $"larghezza 760: ribbon adattato (compatti {bar.CompactCount}, nel menu {bar.OverflowCount})");
+        w.Width = 1500; await Idle(); await Idle();
+        Check(bar.CompactCount == 0 && bar.OverflowCount == 0, "larghezza 1500: ribbon completo");
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
         using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");

@@ -3,7 +3,9 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Shell;
 using PowerNotes.Core.Edit;
 
 namespace PowerNotes.App;
@@ -11,6 +13,7 @@ namespace PowerNotes.App;
 /// <summary>Finestra di dialogo propria: senza bordo di sistema, angoli arrotondati, colori del tema attivo, accento dell'app.</summary>
 public sealed class ThemedDialog : Window
 {
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int size);
     readonly StackPanel _body = new();
     readonly StackPanel _buttons = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 22, 0, 0) };
     Button? _primary, _cancel;
@@ -21,7 +24,12 @@ public sealed class ThemedDialog : Window
     {
         Owner = owner is { IsVisible: true } ? owner : null;
         WindowStartupLocation = Owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
-        WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize;
+        // Niente finestra trasparente (layered) né effetti software: il testo resta nitido (ClearType) anche con scala Windows > 100%.
+        // Ombra e angoli arrotondati li fornisce DWM (Windows 11); su Windows 10 gli angoli restano squadrati.
+        WindowStyle = WindowStyle.None; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize; UseLayoutRounding = true; SnapsToDevicePixels = true;
+        WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(1), UseAeroCaptionButtons = false, CornerRadius = new CornerRadius(0) });
+        SetResourceReference(BackgroundProperty, "PanelBrush");
+        SourceInitialized += (_, _) => { int pref = 2; DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 33, ref pref, 4); };
         SizeToContent = SizeToContent.WidthAndHeight; MinWidth = 380; MaxWidth = 560; Title = title;
         AutomationProperties.SetName(this, title);
 
@@ -37,8 +45,9 @@ public sealed class ThemedDialog : Window
         var ic = Icons.Make(icon, 30, icon == "dlg-error" ? "PowerBrush" : "AccentBrush"); ic.VerticalAlignment = VerticalAlignment.Top; ic.Margin = new Thickness(0, 2, 16, 0);
         var top = new DockPanel(); DockPanel.SetDock(ic, Dock.Left); top.Children.Add(ic); top.Children.Add(head);
         var root = new StackPanel { Margin = new Thickness(26, 24, 26, 20) };
+        _body.Margin = new Thickness(0, 12, 0, 0);
         root.Children.Add(top); root.Children.Add(_body); root.Children.Add(_buttons);
-        var card = new Border { CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(1), Margin = new Thickness(14), Child = root, Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Opacity = 0.35, Color = Colors.Black } };
+        var card = new Border { BorderThickness = new Thickness(1), Child = root };
         card.SetResourceReference(Border.BackgroundProperty, "PanelBrush"); card.SetResourceReference(Border.BorderBrushProperty, "LineBrush");
         Content = card;
         MouseLeftButtonDown += (_, e) => { if (e.OriginalSource is not TextBox) { try { DragMove(); } catch (InvalidOperationException) { } } };
@@ -124,13 +133,31 @@ public sealed class ThemedDialog : Window
         return new SavePromptResult(choice, name, fold);
     }
 
+    /// <summary>Conferma con pulsante primario personalizzato (es. «Applica») e Annulla.</summary>
+    public static bool Confirm(Window? owner, string title, string message, string primary)
+    {
+        var d = new ThemedDialog(owner, title, message, "dlg-info");
+        d.AddButton("Annulla", MessageBoxResult.Cancel, false, true); d.AddButton(primary, MessageBoxResult.OK, true, false);
+        d.ShowDialog();
+        return d.Result == MessageBoxResult.OK;
+    }
+
+    /// <summary>Finestra con contenuto proprio e un solo pulsante «Chiudi».</summary>
+    public static void ShowCustom(Window? owner, string title, string intro, FrameworkElement content, double maxWidth = 680)
+    {
+        var d = new ThemedDialog(owner, title, intro, "dlg-info") { MaxWidth = maxWidth, MinWidth = Math.Min(maxWidth, 560) };
+        d._body.Children.Add(content);
+        d.AddButton("Chiudi", MessageBoxResult.OK, true, true);
+        d.ShowDialog();
+    }
+
     /// <summary>Mostra il pannello senza bloccare (solo per screenshot e automazione).</summary>
-    public static ThemedDialog PreviewSave(Window owner, string docName)
+    public static ThemedDialog PreviewSave(Window owner, string docName, bool topmost = false)
     {
         var d = new ThemedDialog(owner, $"Vuoi salvare le modifiche a «{docName}»?", "Se non salvi, le modifiche andranno perse.", "dlg-question");
         d.AddNameAndPath(System.IO.Path.GetFileNameWithoutExtension(docName), SaveFlow.SuggestedFolder(), _ => null);
         d.AddButton("Annulla", MessageBoxResult.Cancel, false, true); d.AddButton("Non salvare", MessageBoxResult.No, false, false); d.AddButton("Salva", MessageBoxResult.Yes, true, false);
-        d.Show();
+        d.Topmost = topmost; d.Show();
         return d;
     }
 }

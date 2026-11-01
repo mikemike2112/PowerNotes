@@ -98,6 +98,7 @@ public sealed class EditorSession
 
     int Cmp(Pos a, Pos b) { int c = Idx(a.P).CompareTo(Idx(b.P)); return c != 0 ? c : a.Off.CompareTo(b.Off); }
 
+    public void ClearSel() { Anchor = Caret; }
     public bool HasSelection => Caret.P != Anchor.P || Caret.Off != Anchor.Off;
     public (Pos Start, Pos End) Range => Cmp(Caret, Anchor) <= 0 ? (Caret, Anchor) : (Anchor, Caret);
 
@@ -273,6 +274,70 @@ public sealed class EditorSession
     public void DeleteSelection() { if (!HasSelection) return; Begin(); DeleteSelectionCore(); Changed(); }
 
     public string Cut() { var t = SelectedText(); DeleteSelection(); return t; }
+
+    // ---------- Uniforma ----------
+    /// <param name="Runs">elementi di testo modificati</param><param name="Paragraphs">paragrafi toccati</param><param name="Left">paragrafi senza stile, simili a titoli, lasciati com'erano</param>
+    public sealed record UniformResult(int Runs, int Paragraphs, int Left);
+
+    static bool StripRun(RunProperties r)
+    {
+        bool ch = false;
+        foreach (var e in r.ChildElements.Where(e => e is RunFonts or FontSize or FontSizeComplexScript or Color or Highlight or Shading).ToList()) { e.Remove(); ch = true; }
+        return ch;
+    }
+
+    /// <summary>Paragrafo senza stile assegnato che sembra un titolo (tutto grassetto diretto o corpo diretto molto più grande dello stile): nessuna deduzione, resta com'è.</summary>
+    bool HeadingLike(Paragraph p)
+    {
+        if (p.ParagraphProperties?.ParagraphStyleId?.Val?.Value is { } sid && Styles.Find(sid)?.Default?.Value != true) return false;
+        var runs = ParaText.Leaves(p).Where(l => l.Kind == LeafKind.Text && l.Text.Trim().Length > 0).Select(l => l.Run).Distinct().ToList();
+        if (runs.Count == 0) return false;
+        Styles.ResolvePara(p, null, out _, out var baseRun);
+        bool allBold = runs.All(r => r.RunProperties?.Bold != null && (r.RunProperties.Bold.Val?.Value ?? true));
+        bool big = runs.All(r => double.TryParse(r.RunProperties?.FontSize?.Val?.Value, System.Globalization.CultureInfo.InvariantCulture, out var hp) && hp / 2 >= baseRun.Size * 1.2);
+        return allBold || big;
+    }
+
+    (IEnumerable<(Paragraph P, int A, int B)>, bool) UniformTargets()
+    {
+        var ps = Paragraphs();
+        if (HasSelection)
+        {
+            var (s, e) = Range;
+            return (SelectedParagraphs().Select(p => (p, p == s.P ? s.Off : 0, p == e.P ? e.Off : ParaText.Length(p))).ToList(), true);
+        }
+        return (ps.Select(p => (p, 0, ParaText.Length(p))).ToList(), false);
+    }
+
+    UniformResult RunUniform(bool apply)
+    {
+        var (targets, _) = UniformTargets();
+        int runs = 0, paras = 0, left = 0;
+        foreach (var (p, a, b) in targets)
+        {
+            if (HeadingLike(p)) { if (ParaText.Length(p) > 0) left++; continue; }
+            // sull'originale per applicare, su un clone per l'anteprima (stesso conteggio, nessuna modifica)
+            var target = apply ? p : (Paragraph)p.CloneNode(true);
+            int n = 0;
+            if (b > a) { var seen = new HashSet<Run>(); XmlOps.Format(target, a, b, rp => { if (StripRun(rp)) n++; }); }
+            if (a == 0 && b >= ParaText.Length(p) && target.ParagraphProperties?.ParagraphMarkRunProperties is { } pm)
+                foreach (var e in pm.ChildElements.Where(e => e is RunFonts or FontSize or FontSizeComplexScript or Color or Highlight or Shading).ToList()) { e.Remove(); n++; }
+            if (n > 0) { runs += n; paras++; }
+        }
+        return new UniformResult(runs, paras, left);
+    }
+
+    /// <summary>Anteprima: quante modifiche farebbe Uniforma (sulla selezione o, senza selezione, su tutto il corpo). Non modifica nulla.</summary>
+    public UniformResult PreviewUniform() => RunUniform(false);
+
+    /// <summary>Toglie font, dimensione, colore, evidenziazione e sfondo diretti del testo: vale lo stile del paragrafo. Una sola azione di annullamento.</summary>
+    public UniformResult Uniform()
+    {
+        Begin();
+        var r = RunUniform(true);
+        Changed();
+        return r;
+    }
 
     // ---------- appunti con formattazione ----------
     /// <summary>Frammento OOXML (paragrafi ritagliati sulla selezione, con pPr e rPr) per l'incolla formattato. Null senza selezione.</summary>

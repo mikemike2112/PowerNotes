@@ -9,8 +9,11 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Annulla / Ripeti (istantanee XML, digitazione raggruppata)
 - [x] **P0** Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click — test sessione + autotest UI
 - [x] **P0** Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito) — test con mouse reale, screenshot dei due temi, riavvio, file corrotto
-- [x] **P1** Appunti con formattazione (frammento OOXML + testo) — test sessione; tra documenti le immagini sono omesse
+- [x] **P1** Richiesta di salvataggio moderna (nome, percorso, Sfoglia, conferma sovrascrittura) e finestre tematiche al posto delle finestre di sistema — test sessione; tra documenti le immagini sono omesse
 - [x] **P1** Casella Cerca del titolo: esegue comandi o cerca nel testo — autotest UI
+- [x] **P1** Powers · Uniforma: toglie font, dimensione, colore, evidenziazione e sfondo diretti (selezione o corpo), anteprima con conteggio, un solo annulla — test Core su 5 file del corpus + riapertura in Word
+- [x] **P1** Powers · Scudo privacy: analizza autori, società, proprietà, commenti/revisioni, persone, percorsi, miniatura; crea una copia ripulita e la ricontrolla; elenca gli avvisi — test: dati noti assenti in ogni parte, originale identico byte per byte, copia valida e aperta da Word
+- [x] **P0** Pulsante ingrandisci/ripristina con icona e tooltip a seconda dello stato; ribbon adattivo (gruppi compatti, poi menu «⋯») — autotest UI + screenshot a 1500/1100/800/700 px
 - [x] **P0** Intestazione/piè di pagina modificabili sul foglio (doppio clic, Esc) — test sessione + autotest UI
 - [ ] **P2** Salvataggio con password, firma, versioni
 
@@ -83,19 +86,14 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ### Pagine
 - [ ] **P1** Pagina vuota
 - [x] **P0** Interruzione di pagina
-- [ ] **P2** Frontespizio
 
 ### Tabelle
 - [x] **P0** Tabella — inserimento, celle unite, righe/colonne
 
 ### Illustrazioni
 - [ ] **P2** Icone
-- [ ] **P2** Modelli 3D
-- [ ] **P2** SmartArt...
-- [ ] **P2** Grafico...
 - [x] **P0** Immagini — inline PNG/JPEG/GIF/BMP
 - [ ] **P1** Forme
-- [ ] **P2** Schermata
 
 ### Elementi multimediali
 - [ ] **P2** Video online...
@@ -103,7 +101,6 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ### Collegamenti
 - [ ] **P1** Collegamento
 - [ ] **P1** Segnalibro...
-- [ ] **P2** Riferimento incrociato...
 
 ### Commenti
 - [ ] **P1** Commento
@@ -117,7 +114,6 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [ ] **P2** Riga della firma
 - [ ] **P2** Data e ora...
 - [ ] **P2** Oggetto...
-- [ ] **P1** Casella di testo
 - [ ] **P2** Parti rapide
 - [ ] **P2** WordArt
 - [ ] **P2** Capolettera
@@ -158,7 +154,6 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Colonne — menu 1/2/3 colonne uguali
 - [x] **P0** Interruzioni — pagina, sezione pagina successiva, sezione continua
 - [ ] **P1** Numeri di riga
-- [ ] **P1** Sillabazione
 
 ### Paragrafo
 - [ ] **P2** Aumenta
@@ -200,7 +195,6 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [ ] **P2** Inserisci didascalia...
 - [ ] **P2** Inserisci indice delle figure...
 - [ ] **P2** Aggiorna tabella
-- [ ] **P2** Riferimento incrociato...
 
 ### Indice
 - [ ] **P2** Segna voce...
@@ -286,9 +280,6 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ### Visualizzazioni
 - [ ] **P2** Modalità di lettura
 - [x] **P0** Layout di stampa — unica vista
-- [ ] **P2** Layout Web
-- [ ] **P2** Struttura
-- [ ] **P2** Bozza
 
 ### Immersiva
 - [ ] **P2** Focus

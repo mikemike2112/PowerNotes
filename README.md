@@ -11,6 +11,10 @@ Elaboratore di testi per Windows 10/11 x64 che apre e salva **.docx nativo** (OO
 ## Interfaccia
 Barra del titolo con salva/annulla/ripeti e casella Cerca (comandi o testo), schede File/Home/Inserisci/Layout/Visualizza/**Powers** più la scheda contestuale Layout di tabella, ribbon a gruppi, righelli in cm, barra di stato con pagina, parole, lingua, viste e zoom. I comandi non ancora implementati sono visibili ma disabilitati ("Non ancora disponibile"). La scheda **Powers** (rosso `#FF2400`) ha l'interruttore *Modalità scura*: tema scuro predefinito, scelta salvata in `%APPDATA%\PowerNotes\settings.json` (file corrotto → valori predefiniti). Icona fornita dall'autore; accento `#0BCCEA` dal suo sfondo.
 
+**Powers** contiene anche due strumenti locali: **Uniforma** (toglie font, dimensione, colore, evidenziazione e sfondo diretti del testo, con anteprima e un solo annulla) e **Scudo privacy** (mostra autore, società, proprietà, autori di commenti e revisioni, percorsi e miniatura; crea una *copia* ripulita, la ricontrolla e dichiara esplicitamente ciò che non sa pulire).
+
+La finestra si adatta alla larghezza: sotto lo spazio disponibile i gruppi del ribbon passano a sole icone, poi in un menu «⋯».
+
 ## Cosa fa (P0)
 Grassetto, corsivo, sottolineato, barrato, apice/pedice, font, dimensione, colore, evidenziazione; allineamento, interlinea, rientri, spaziatura; stili (Normale, Titolo, Sottotitolo, Titolo 1-3, Citazione…); elenchi puntati e numerati multilivello; tabelle con celle unite (orizzontali e verticali); immagini inline; impostazione pagina, interruzioni di pagina, intestazioni, piè di pagina e numeri di pagina; vista Layout di stampa con paginazione reale, annulla/ripeti, trova e sostituisci; esportazione PDF e stampa. Dettaglio e stato: [FEATURES.md](FEATURES.md). Confronto con Word: [COMPAT.md](COMPAT.md).
 

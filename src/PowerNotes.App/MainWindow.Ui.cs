@@ -22,7 +22,9 @@ public partial class MainWindow
     Slider _zoomSlider = null!;
     TextBlock _zoomPct = null!;
     TextBox _indL = null!, _indR = null!, _spB = null!, _spA = null!;
-    readonly List<(string Name, StackPanel Content, bool Contextual, TextBlock Header, Border Frame)> _tabs = new();
+    readonly List<(string Name, RibbonBar Content, bool Contextual, TextBlock Header, Border Frame)> _tabs = new();
+    List<UIElement>? _curLabels;
+    Button? _maxBtn;
     readonly List<(string Label, Action Act, Button Btn)> _cmds = new();
     int _tab;
     Button? _printViewBtn;
@@ -43,7 +45,7 @@ public partial class MainWindow
         CollapseBtn.Content = Icons.Make("caret", 14);
         CollapseBtn.Click += (_, _) => { bool c = RibbonFrame.Height > 40; RibbonFrame.Height = c ? 8 : 126; RibbonHost.Visibility = c ? Visibility.Collapsed : Visibility.Visible; };
         Scroller.ScrollChanged += (_, _) => UpdateRulers();
-        SizeChanged += (_, _) => UpdateRulers();
+        SizeChanged += (_, _) => { UpdateRulers(); Adapt(); };
         View.StateChanged += UpdateRulers;
         SelectTab(0);
     }
@@ -54,7 +56,12 @@ public partial class MainWindow
     {
         var sp = new StackPanel { Orientation = large ? Orientation.Vertical : Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         if (icon != null) { var ic = Icons.Make(icon, iconSize); if (!large && label != null) ic.Margin = new Thickness(0, 0, 6, 0); if (large) ic.Margin = new Thickness(0, 2, 0, 3); sp.Children.Add(ic); }
-        if (label != null) sp.Children.Add(new TextBlock { Text = label, FontSize = 12, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = large ? 76 : 200, VerticalAlignment = VerticalAlignment.Center });
+        if (label != null)
+        {
+            var tl = new TextBlock { Text = label, FontSize = 12, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = large ? 76 : 200, VerticalAlignment = VerticalAlignment.Center };
+            sp.Children.Add(tl);
+            if (icon != null) _curLabels?.Add(tl);   // nascosta quando il gruppo si compatta
+        }
         var b = new Button { Content = sp, Padding = large ? new Thickness(6, 2, 6, 2) : new Thickness(5, 3, 5, 3), MinWidth = large ? 54 : 24, HorizontalContentAlignment = large ? HorizontalAlignment.Center : HorizontalAlignment.Left };
         System.Windows.Automation.AutomationProperties.SetName(b, label ?? tip ?? icon ?? "");
         b.ToolTip = enabled ? (tip ?? label) : Soon;
@@ -81,7 +88,7 @@ public partial class MainWindow
     static StackPanel Row(params UIElement[] els) { var p = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) }; foreach (var e in els) p.Children.Add(e); return p; }
     static StackPanel Col(params UIElement[] els) { var p = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Top }; foreach (var e in els) p.Children.Add(e); return p; }
 
-    StackPanel Group(StackPanel tab, string name, Action? launcher = null)
+    StackPanel Group(RibbonBar tab, string name, Action? launcher = null)
     {
         var content = new StackPanel { Orientation = Orientation.Horizontal };
         var g = new Grid { Margin = new Thickness(0, 0, 0, 0) };
@@ -95,13 +102,14 @@ public partial class MainWindow
             l.Click += (_, _) => launcher(); Grid.SetRow(l, 1); g.Children.Add(l);
         }
         var sep = new Border { Width = 1, Margin = new Thickness(4, 4, 0, 6) }; sep.SetResourceReference(Border.BackgroundProperty, "LineBrush");
-        tab.Children.Add(g); tab.Children.Add(sep);
+        var info = tab.AddGroup(new StackPanel { Orientation = Orientation.Horizontal, Children = { g, sep } });
+        _curLabels = info.Labels;
         return content;
     }
 
-    StackPanel NewTab(string name, bool contextual = false, bool power = false)
+    RibbonBar NewTab(string name, bool contextual = false, bool power = false)
     {
-        var content = new StackPanel { Orientation = Orientation.Horizontal };
+        var content = new RibbonBar();
         var header = new TextBlock { Text = name, FontSize = 14, Padding = new Thickness(11, 6, 11, 4) };
         if (power) header.SetResourceReference(TextBlock.ForegroundProperty, "PowerBrush");
         else if (contextual) header.Foreground = new SolidColorBrush(Color.FromRgb(0x0a, 0x7f, 0x94));
@@ -129,6 +137,7 @@ public partial class MainWindow
             _tabs[k].Header.FontWeight = sel ? FontWeights.SemiBold : FontWeights.Normal;
         }
         RibbonHost.Content = _tabs[i].Content;
+        _tabs[i].Content.Relayout();
         // la cornice del ribbon segue il colore della scheda Powers
         if (_tabs[i].Name == "Powers") RibbonFrame.BorderBrush = (Brush)FindResource("PowerBrush"); else RibbonFrame.SetResourceReference(Border.BorderBrushProperty, "LineBrush");
     }
@@ -166,8 +175,31 @@ public partial class MainWindow
             b.Click += (_, _) => a(); WindowChrome.SetIsHitTestVisibleInChrome(b, true); CaptionButtons.Children.Add(b); return b;
         }
         Cap("min", () => WindowState = WindowState.Minimized);
-        Cap("max", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized);
+        _maxBtn = Cap("max", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized);
+        StateChanged += (_, _) => UpdateMaxButton();
+        UpdateMaxButton();
         Cap("close", Close, true);
+    }
+
+    /// <summary>Adatta barra del titolo e barra di stato alla larghezza: titolo troncato, viste e testi secondari nascosti, zoom compatto.</summary>
+    void Adapt()
+    {
+        double w = ActualWidth;
+        TitleLabel.TextTrimming = TextTrimming.CharacterEllipsis; TitleLabel.MaxWidth = Math.Max(48, w * 0.2);
+        ViewBar.Visibility = w < 960 ? Visibility.Collapsed : Visibility.Visible;
+        WordsText.Visibility = w < 800 ? Visibility.Collapsed : Visibility.Visible;
+        _zoomSlider.Width = w < 900 ? 56 : 120;
+        QuickBar.Margin = new Thickness(w < 800 ? 6 : 12, 0, 0, 0);
+    }
+
+    /// <summary>Icona e tooltip del pulsante ingrandisci: un quadrato a finestra, due quadrati a schermo intero. Si aggiorna a ogni cambio di stato.</summary>
+    void UpdateMaxButton()
+    {
+        if (_maxBtn == null) return;
+        bool max = WindowState == WindowState.Maximized;
+        _maxBtn.Content = Icons.Make(max ? "restore" : "max", 14);
+        _maxBtn.ToolTip = max ? "Ripristina giù" : "Ingrandisci";
+        System.Windows.Automation.AutomationProperties.SetName(_maxBtn, max ? "Ripristina giù" : "Ingrandisci");
     }
 
     /// <summary>Casella Cerca: esegue il primo comando abilitato il cui nome contiene il testo; altrimenti cerca il testo nel documento.</summary>
@@ -265,22 +297,19 @@ public partial class MainWindow
         // ====== Inserisci
         var ins = NewTab("Inserisci");
         g = Group(ins, "Pagine");
-        var pg = new StackPanel(); Stub(pg, "Frontespizio", "blankpage"); Stub(pg, "Pagina vuota", "blankpage"); Small(pg, "Interruzione di pagina", "pagebreak", () => Do(() => _s.InsertPageBreak())); g.Children.Add(pg);
+        var pg = new StackPanel(); Stub(pg, "Pagina vuota", "blankpage"); Small(pg, "Interruzione di pagina", "pagebreak", () => Do(() => _s.InsertPageBreak())); g.Children.Add(pg);
         g = Group(ins, "Tabelle");
         Large(g, "Tabella", "table", () => InsertTable_Click(this, new RoutedEventArgs()));
         g = Group(ins, "Illustrazioni");
         Large(g, "Immagini", "image", () => InsertImage_Click(this, new RoutedEventArgs()));
-        var il = new StackPanel(); Stub(il, "Forme", "generic"); Stub(il, "Icone", "generic"); Stub(il, "Modelli 3D", "generic"); g.Children.Add(il);
-        var il2 = new StackPanel(); Stub(il2, "SmartArt", "generic"); Stub(il2, "Grafico", "generic"); Stub(il2, "Schermata", "generic"); g.Children.Add(il2);
+        var il = new StackPanel(); Stub(il, "Forme", "generic"); Stub(il, "Icone", "generic"); g.Children.Add(il);
         g = Group(ins, "Collegamenti");
-        var lk = new StackPanel(); Stub(lk, "Collegamento", "generic"); Stub(lk, "Segnalibro", "generic"); Stub(lk, "Riferimento incrociato", "generic"); g.Children.Add(lk);
+        var lk = new StackPanel(); Stub(lk, "Collegamento", "generic"); Stub(lk, "Segnalibro", "generic"); g.Children.Add(lk);
         g = Group(ins, "Intestazione e piè di pagina");
         var hf = new StackPanel();
         Small(hf, "Intestazione", "header", () => HeaderFooter(true)); Small(hf, "Piè di pagina", "footer", () => HeaderFooter(false));
         Small(hf, "Numero di pagina", "pagenum", () => { var t = _s.GetHeaderFooterText(false); Do(() => _s.SetHeaderFooter(false, t, Align.Center, PageNumFormat.PageOfTotal)); });
         g.Children.Add(hf);
-        g = Group(ins, "Testo");
-        Stub(g, "Casella di testo", "textbox", true);
 
         // ====== Layout
         var lay = NewTab("Layout");
@@ -293,7 +322,7 @@ public partial class MainWindow
         var ro = new StackPanel();
         var brk = Small(ro, "Interruzioni", "breaks", () => { });
         brk.Click += (_, _) => Menu(brk, ("Interruzione di pagina", () => Do(() => _s.InsertPageBreak())), ("Sezione: pagina successiva", () => Do(() => _s.InsertSectionBreak(false))), ("Sezione: continua", () => Do(() => _s.InsertSectionBreak(true))));
-        Stub(ro, "Numeri di riga", "generic"); Stub(ro, "Sillabazione", "generic"); g.Children.Add(ro);
+        Stub(ro, "Numeri di riga", "generic"); g.Children.Add(ro);
         g = Group(lay, "Paragrafo", () => ParaDialog_Click(this, new RoutedEventArgs()));
         TextBox Num(string tip) { var t = new TextBox { Width = 58, Height = 22, ToolTip = tip, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 1, 2, 1) }; System.Windows.Automation.AutomationProperties.SetName(t, tip); return t; }
         _indL = Num("Rientro a sinistra (cm)"); _indR = Num("Rientro a destra (cm)"); _spB = Num("Spaziatura prima (pt)"); _spA = Num("Spaziatura dopo (pt)");
@@ -309,8 +338,6 @@ public partial class MainWindow
         g = Group(vw, "Visualizzazioni");
         Stub(g, "Modalità di lettura", "read", true);
         var lp = Large(g, "Layout di stampa", "print", () => { }); lp.SetResourceReference(Control.BackgroundProperty, "HoverBrush");
-        Stub(g, "Layout Web", "web", true);
-        var vo = new StackPanel(); Stub(vo, "Struttura", "outline"); Stub(vo, "Bozza", "outline"); g.Children.Add(vo);
         g = Group(vw, "Mostra");
         var rul = new CheckBox { Content = "Righello", IsChecked = true, Margin = new Thickness(4, 4, 4, 4) };
         rul.Click += (_, _) => { var v = rul.IsChecked == true ? Visibility.Visible : Visibility.Collapsed; HRuler.Visibility = v; VRuler.Visibility = v; };
@@ -346,6 +373,10 @@ public partial class MainWindow
         sw.Children.Add(new TextBlock { Text = "Modalità scura", HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0), FontSize = 12 });
         g.Children.Add(sw);
 
+        g = Group(pw, "Strumenti");
+        Large(g, "Uniforma", "uniform", () => UniformCommand(), "Uniforma: toglie font, dimensione, colore, evidenziazione e sfondo diretti del testo (selezione o tutto il corpo)");
+        Large(g, "Scudo privacy", "shield", () => PrivacyCommand(), "Scudo privacy: trova dati personali nel documento e crea una copia ripulita");
+
         // ====== Layout di tabella (contestuale)
         var tl = NewTab("Layout di tabella", contextual: true);
         g = Group(tl, "Tabella");
@@ -374,6 +405,28 @@ public partial class MainWindow
         var m = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
         foreach (var (t, a) in items) { var it = new MenuItem { Header = t }; var aa = a; it.Click += (_, _) => aa(); m.Items.Add(it); }
         m.IsOpen = true;
+    }
+
+    // ---------------------------------------------------------------- Powers
+    public void RunUniformPreview() => UniformCommand();
+    public void RunPrivacy() => PrivacyCommand();
+
+    void UniformCommand()
+    {
+        var pv = _s.PreviewUniform();
+        string scope = _s.HasSelection ? "nella selezione" : "nel corpo del documento";
+        if (pv.Runs == 0) { ThemedDialog.Show(this, $"Niente da uniformare {scope}." + (pv.Left > 0 ? $" {pv.Left} paragrafi simili a titoli, senza stile, restano come sono." : ""), "Uniforma", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        string msg = $"{pv.Runs} modifiche in {pv.Paragraphs} paragrafi {scope}: font, dimensione, colore, evidenziazione e sfondo del testo tornano a quelli dello stile. Restano grassetto, corsivo, sottolineato, apice/pedice, collegamenti, immagini, tabelle ed elenchi."
+            + (pv.Left > 0 ? Environment.NewLine + $"{pv.Left} paragrafi senza stile e simili a titoli restano come sono." : "");
+        if (ThemedDialog.Confirm(this, "Uniforma", msg, "Applica")) Do(() => _s.Uniform());
+    }
+
+    void PrivacyCommand()
+    {
+        byte[] bytes;
+        try { bytes = _doc.ToBytes(); }
+        catch (Exception e) when (e is System.IO.IOException or InvalidOperationException) { ThemedDialog.Show(this, "Impossibile leggere il documento: " + e.Message, "Scudo privacy", MessageBoxButton.OK, MessageBoxImage.Error); return; }
+        PrivacyDialog.Show(this, bytes, _doc.Path, DocDisplayName);
     }
 
     // ---------------------------------------------------------------- finestre
