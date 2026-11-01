@@ -179,6 +179,20 @@ function Patch-Props([string]$path) {
   } finally { $zip.Dispose() }
 }
 
+# autore delle revisioni e account (userId) nei part word/*.xml: nessun dato personale nel corpus
+function Patch-Authors([string]$path) {
+  $zip = [System.IO.Compression.ZipFile]::Open($path, 'Update')
+  try {
+    foreach ($e in @($zip.Entries | Where-Object { $_.FullName -like 'word/*.xml' })) {
+      $sr = New-Object IO.StreamReader($e.Open()); $x = $sr.ReadToEnd(); $sr.Close()
+      $y = [regex]::Replace($x, 'w:author="[^"]*"', 'w:author="Corpus"')
+      $y = [regex]::Replace($y, 'w15:author="[^"]*"', 'w15:author="Corpus"')
+      $y = [regex]::Replace($y, 'w15:providerId="[^"]*" w15:userId="[^"]*"', 'w15:providerId="None" w15:userId="Corpus"')
+      if ($y -ne $x) { $n = $e.FullName; $e.Delete(); $ne = $zip.CreateEntry($n); $sw = New-Object IO.StreamWriter($ne.Open(), (New-Object Text.UTF8Encoding($false))); $sw.Write($y); $sw.Close() }
+    }
+  } finally { $zip.Dispose() }
+}
+
 $s0 = Start-PNWord 900
 try {
   $w = $s0.App
@@ -193,6 +207,6 @@ try {
       $d.SaveAs2([string]$path, 12)
       Write-Host "ok $k"
     } catch { Write-Host "FALLITO $k : $_" } finally { $d.Close(0) }
-    if (Test-Path $path) { Patch-Props $path }
+    if (Test-Path $path) { Patch-Props $path; Patch-Authors $path }
   }
 } finally { Stop-PNWord $s0 }

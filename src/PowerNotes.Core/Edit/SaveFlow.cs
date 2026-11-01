@@ -36,7 +36,7 @@ public static class SaveFlow
     }
 
     /// <summary>Cartella proposta per un documento senza file: Documenti dell'utente. È solo una proposta, non viene creata né scritta.</summary>
-    public static string SuggestedFolder() => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+    public static string SuggestedFolder() => Environment.GetEnvironmentVariable("POWERNOTES_DEFAULT_FOLDER") is { Length: > 0 } f ? f : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);   // la variabile serve solo per gli screenshot
 
     /// <summary>
     /// Esegue il flusso. prompt: mostra la richiesta (ripetuta finché Salva non va a buon fine o l'utente sceglie altro).
