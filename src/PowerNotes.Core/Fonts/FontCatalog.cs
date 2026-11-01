@@ -7,13 +7,13 @@ public static class FontCatalog
 {
     public record Entry(string File, int Index);
 
-    static readonly Dictionary<string, Entry> Map = Build();   // chiave: "famiglia|b|i"
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Entry> Map = Build();   // chiave: "famiglia|b|i"
     static readonly Dictionary<string, FontFile?> Cache = new();
     const string Fallback = "Arial";
 
-    static Dictionary<string, Entry> Build()
+    static System.Collections.Concurrent.ConcurrentDictionary<string, Entry> Build()
     {
-        var m = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
+        var m = new System.Collections.Concurrent.ConcurrentDictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
         if (!OperatingSystem.IsWindows()) return m;
         var dir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
         foreach (var (hive, key) in new[] { (Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"), (Registry.CurrentUser, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") })

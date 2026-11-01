@@ -178,17 +178,34 @@ public sealed class DocumentView : FrameworkElement
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         Focus();
-        if (_s == null) return;
-        var hit = ToPage(e.GetPosition(this));
-        if (hit == null) return;
-        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        _s.SetCaretAt(hit.Value.page, hit.Value.x, hit.Value.y, shift);
-        if (e.ClickCount == 2) _s.SelectWord();
-        else if (e.ClickCount >= 3) { _s.SetCaret(_s.Caret.P, 0); _s.SetCaret(_s.Caret.P, ParaText.Length(_s.Caret.P), true); }
-        _dragging = e.ClickCount == 1;
+        bool started = ClickAt(e.GetPosition(this), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift), e.ClickCount);
+        _dragging = started && e.ClickCount == 1;
         if (_dragging) CaptureMouse();
-        Refresh();
         e.Handled = true;
+    }
+
+    /// <summary>Click in coordinate della vista (DIP): sposta caret/selezione. Usato dal mouse e dall'autotest.</summary>
+    public bool ClickAt(Point pos, bool extend, int clickCount = 1)
+    {
+        if (_s == null) return false;
+        var hit = ToPage(pos);
+        if (hit == null) return false;
+        _s.SetCaretAt(hit.Value.page, hit.Value.x, hit.Value.y, extend);
+        if (clickCount == 2) _s.SelectWord();
+        else if (clickCount >= 3) { _s.SetCaret(_s.Caret.P, 0); _s.SetCaret(_s.Caret.P, ParaText.Length(_s.Caret.P), true); }
+        Refresh();
+        return true;
+    }
+
+    /// <summary>Punto della vista (DIP) corrispondente a una posizione del documento.</summary>
+    public Point? PointFor(Paragraph p, int off)
+    {
+        if (_s == null) return null;
+        var l = _s.Layout.Locate(p, off);
+        if (l == null) return null;
+        var (_, _, tops) = Metrics();
+        var r = PageRect(l.PageIndex, tops);
+        return new Point(r.X + l.XAt(off) * Scale, r.Y + (l.Y + l.Height / 2) * Scale);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)

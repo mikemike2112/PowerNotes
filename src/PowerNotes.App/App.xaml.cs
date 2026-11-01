@@ -17,7 +17,7 @@ public partial class App : Application
         };
         var w = new MainWindow();
         string? shot = null; double zoom = 1; bool light = false; int tab = 0; int sel = 0;
-        string? path = null;
+        string? path = null; string? selftest = null;
         for (int i = 0; i < e.Args.Length; i++)
         {
             switch (e.Args[i])
@@ -27,6 +27,7 @@ public partial class App : Application
                 case "--light": light = true; break;
                 case "--tab": tab = int.Parse(e.Args[++i]); break;
                 case "--select": sel = int.Parse(e.Args[++i]); break;
+                case "--selftest": selftest = e.Args[++i]; break;
                 default: path ??= e.Args[i]; break;
             }
         }
@@ -35,6 +36,16 @@ public partial class App : Application
         w.View.SetZoom(zoom);
         w.SelectTab(tab);
         w.Show();
+        if (selftest != null)
+        {
+            w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, async () =>
+            {
+                int fails;
+                try { fails = await SelfTest.Run(w, selftest); }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(selftest, "selftest-errore.txt"), ex.ToString()); fails = 99; }
+                Shutdown(fails);
+            });
+        }
         if (shot != null)
         {
             // modalità schermata per README/verifica: disegna la finestra reale su PNG ed esce

@@ -43,6 +43,9 @@ public partial class MainWindow : Window
         Loaded += (_, _) => View.Focus();
     }
 
+    public EditorSession Session => _s;
+    public WordDoc Doc => _doc;
+
     // ---------- documento ----------
     void Load(WordDoc d)
     {

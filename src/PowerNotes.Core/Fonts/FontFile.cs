@@ -17,7 +17,7 @@ public sealed class FontFile
     int _hmtx;
     int _numGlyphs;
     readonly Dictionary<int, ushort> _cmap = new();
-    readonly Dictionary<int, double> _adv = new();
+    readonly System.Collections.Concurrent.ConcurrentDictionary<int, double> _adv = new();
 
     /// <summary>Altezza riga "single" come Word: ascent + descent + lineGap (hhea).</summary>
     public double LineHeightEm => Ascent + Descent + LineGap;

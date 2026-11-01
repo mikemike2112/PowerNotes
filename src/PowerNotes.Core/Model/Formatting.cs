@@ -201,7 +201,10 @@ public sealed class StyleResolver
         return (p, r);
     }
 
-    public ParaFmt ResolvePara(Paragraph para, string? tableStyleId, out RunFmt markRun)
+    public ParaFmt ResolvePara(Paragraph para, string? tableStyleId, out RunFmt markRun) => ResolvePara(para, tableStyleId, out markRun, out _);
+
+    /// <summary>markRun = segno di paragrafo (stile + pPr/rPr); baseRun = base per i run (solo stile).</summary>
+    public ParaFmt ResolvePara(Paragraph para, string? tableStyleId, out RunFmt markRun, out RunFmt baseRun)
     {
         var pPr = para.ParagraphProperties;
         var (p, r) = ParaBase(pPr?.ParagraphStyleId?.Val?.Value, tableStyleId);
@@ -213,6 +216,7 @@ public sealed class StyleResolver
         if (numId is > 0 && GetLevelPPr(numId.Value, ilvl) is { } lp) ApplyPPr(p, lp);
         ApplyPPr(p, pPr);
         p.NumId = numId; p.Ilvl = ilvl;
+        baseRun = r.Clone();
         markRun = r.Clone();
         ApplyRPr(markRun, pPr?.ParagraphMarkRunProperties);
         return p;

@@ -458,7 +458,7 @@ public sealed class LayoutEngine
 
     ParaL BuildPara(Paragraph p, double x, double width, string? tableStyle, Ctx c)
     {
-        var F = c.St.ResolvePara(p, tableStyle, out var mark);
+        var F = c.St.ResolvePara(p, tableStyle, out var mark, out var baseRun);
         var para = new ParaL { P = p, F = F, X = x, Width = width, Before = F.Before, After = F.After };
         var atoms = new List<Atom>();
         double indL = F.IndLeft, indR = F.IndRight, first = F.FirstLine;
@@ -474,7 +474,7 @@ public sealed class LayoutEngine
         }
         foreach (var leaf in ParaText.Leaves(p))
         {
-            if (!c.RunCache.TryGetValue(leaf.Run, out var f)) c.RunCache[leaf.Run] = f = c.St.ResolveRun(mark, leaf.Run);
+            if (!c.RunCache.TryGetValue(leaf.Run, out var f)) c.RunCache[leaf.Run] = f = c.St.ResolveRun(baseRun, leaf.Run);
             switch (leaf.Kind)
             {
                 case LeafKind.Tab: atoms.Add(new Atom { K = 't', Text = "\t", Fmt = f, Start = leaf.Start, Len = 1 }); break;
