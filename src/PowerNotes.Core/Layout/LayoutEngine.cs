@@ -19,7 +19,7 @@ public sealed class LayoutEngine
     sealed class LineL { public double NatH; public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
     sealed class ParaL : Block { public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
     sealed class CellL { public double X, W, ContentH, H; public int RowSpan = 1, Col, Span; public List<Block> Content = new(); public string? Fill; public Bdr?[] B = new Bdr?[4]; public bool Continue; public string VAlign = "top"; public double MarT, MarB; }
-    sealed class RowL { public double H; public List<CellL> Cells = new(); public bool Exact; }
+    sealed class RowL { public TableRow? Src; public double H; public List<CellL> Cells = new(); public bool Exact; }
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
     record Bdr(double W, string Color);
 
@@ -570,7 +570,7 @@ public sealed class LayoutEngine
         LineL cur = new() { Left = indL + first };
         double x = cur.Left;
         bool content = false;
-        double maxAsc = 0, maxDesc = 0;
+        double maxAsc = 0, maxDesc = 0, fontNat = 0;
         int lineStartOffset = 0;
         double spacesInLine = 0;
         var lines = para.Lines;
@@ -581,6 +581,7 @@ public sealed class LayoutEngine
             var ff = FontCatalog.Get(a?.MetricFont ?? f.Font, f.Bold, f.Italic);
             maxAsc = Math.Max(maxAsc, (ff.Ascent + ff.LineGap) * f.EffSize);
             maxDesc = Math.Max(maxDesc, ff.Descent * f.EffSize);
+            fontNat = Math.Max(fontNat, ff.LineHeightEm * f.EffSize);
         }
 
         void Finish(bool last, bool forced)
@@ -590,7 +591,7 @@ public sealed class LayoutEngine
             double nat = maxAsc + maxDesc, h = nat, bl = maxAsc;
             if (F.LineRule == "exact") { h = F.Line / 20.0; bl = h * maxAsc / nat; }
             else if (F.LineRule == "atLeast") { h = Math.Max(nat, F.Line / 20.0); bl = maxAsc + (h - nat); }
-            else if (F.Line != 240) { h = nat * F.Line / 240.0; bl = maxAsc + (h - nat); }
+            else if (F.Line != 240) { h = nat + fontNat * (F.Line / 240.0 - 1); bl = maxAsc + (h - nat); }   // il multiplo scala solo la parte di testo: le immagini inline no
             cur.H = h; cur.NatH = h; cur.Base = bl; cur.Last = last;
             // larghezza utilizzata senza spazi finali
             int endIdx = cur.Segs.Count;
@@ -624,7 +625,7 @@ public sealed class LayoutEngine
             lineStartOffset = cur.End;
             lines.Add(cur);
             cur = new() { Left = indL };
-            x = cur.Left; content = false; maxAsc = maxDesc = 0; spacesInLine = 0;
+            x = cur.Left; content = false; maxAsc = maxDesc = fontNat = 0; spacesInLine = 0;
         }
 
         for (int ai = 0; ai < atoms.Count; ai++)
@@ -787,6 +788,13 @@ public sealed class LayoutEngine
                 row.Cells.Add(cell);
                 col += span;
             }
+            row.Src = tr;
+            t.Rows.Add(row);
+        }
+        // altezze di riga: dopo aver costruito tutte le righe (i RowSpan si conoscono solo a fine tabella)
+        foreach (var row in t.Rows)
+        {
+            var tr = row.Src!;
             var trh = tr.TableRowProperties?.GetFirstChild<TableRowHeight>();
             double rh = row.Cells.Where(k => k.RowSpan == 1 && !k.Continue).Select(k => k.H).DefaultIfEmpty(0).Max();
             if (trh?.Val?.Value is { } hv)
@@ -796,7 +804,6 @@ public sealed class LayoutEngine
             }
             if (rh == 0) rh = 14;
             row.H = rh;
-            t.Rows.Add(row);
         }
         // celle con unione verticale: se il contenuto eccede, allunga l'ultima riga del gruppo
         for (int ri = 0; ri < t.Rows.Count; ri++)
