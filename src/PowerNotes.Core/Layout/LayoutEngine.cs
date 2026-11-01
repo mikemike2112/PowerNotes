@@ -14,12 +14,12 @@ public sealed class LayoutEngine
 {
     // ---- strutture intermedie ----
     abstract class Block { public double Height; }
-    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public double TabPos; }
+    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; }
     sealed class SegL { public Atom A = null!; public double X; public double W; }
-    sealed class LineL { public double NatH; public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
+    sealed class LineL { public double NatH; public double H, Base; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
     sealed class ParaL : Block { public List<FloatL> Floats = new(); public Story Story; public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
     sealed class CellL { public double X, W, ContentH, H; public int RowSpan = 1, Col, Span; public List<Block> Content = new(); public string? Fill; public Bdr?[] B = new Bdr?[4]; public bool Continue; public string VAlign = "top"; public double MarT, MarB; }
-    sealed class RowL { public bool IsHeader; public TableRow? Src; public double H; public List<CellL> Cells = new(); public bool Exact; }
+    sealed class RowL { public bool IsHeader; public TableRow? Src; public double H; public List<CellL> Cells = new(); }
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
     record Bdr(double W, string Color);
     /// <summary>Oggetto ancorato (immagine o casella di testo): posizione risolta in fase di emissione.</summary>
@@ -645,7 +645,6 @@ public sealed class LayoutEngine
         bool content = false;
         double maxAsc = 0, maxDesc = 0, fontNat = 0;
         int lineStartOffset = 0;
-        double spacesInLine = 0;
         var lines = para.Lines;
 
         void Metr(RunFmt f, Atom? a = null)
@@ -698,7 +697,7 @@ public sealed class LayoutEngine
             lineStartOffset = cur.End;
             lines.Add(cur);
             cur = new() { Left = indL };
-            x = cur.Left; content = false; maxAsc = maxDesc = fontNat = 0; spacesInLine = 0;
+            x = cur.Left; content = false; maxAsc = maxDesc = fontNat = 0;
         }
 
         for (int ai = 0; ai < atoms.Count; ai++)

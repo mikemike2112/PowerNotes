@@ -102,7 +102,11 @@ public sealed class EditorSession
     public (Pos Start, Pos End) Range => Cmp(Caret, Anchor) <= 0 ? (Caret, Anchor) : (Anchor, Caret);
 
     // ---------- modifica: infrastruttura ----------
-    void Begin(string? key = null) => Doc.BeginEdit(Idx(Caret.P), Caret.Off, Idx(Anchor.P), Anchor.Off, key);
+    int _batch;
+    void Begin(string? key = null) { if (_batch > 1) return; Doc.BeginEdit(Idx(Caret.P), Caret.Off, Idx(Anchor.P), Anchor.Off, key); if (_batch == 1) _batch = 2; }
+
+    /// <summary>Raggruppa più comandi in un'unica voce di annullamento (es. finestra Carattere).</summary>
+    public void Batch(Action a) { _batch = 1; try { a(); } finally { _batch = 0; } }
 
     void Set(Pos p, bool keepAnchor = false, bool keepGoal = false)
     {

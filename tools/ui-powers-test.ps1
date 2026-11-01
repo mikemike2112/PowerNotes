@@ -6,6 +6,9 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing, System.Windows.Forms
 Add-Type -Namespace PN -Name Native -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr after, int x, int y, int cx, int cy, uint f);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr WindowFromPoint(int x, int y);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr GetAncestor(System.IntPtr h, uint f);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr h, System.IntPtr hdc, uint flags);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, System.UIntPtr e);
@@ -28,9 +31,10 @@ function Start-App {
         $win = $root.FindFirst('Children', [System.Windows.Automation.PropertyCondition]::new($A::ProcessIdProperty, [int]$p.Id))
     }
     if (-not $win) { throw 'finestra non trovata' }
-    Start-Sleep -Seconds 2
+    if (-not (Try-Find $win 'Powers' 20000)) { throw 'interfaccia non pronta' }
     [void][PN.Native]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle)
     Start-Sleep -Milliseconds 500
+    $script:topHwnd = $win.Current.NativeWindowHandle
     [pscustomobject]@{ Proc = $p; Win = $win }
 }
 function Stop-App($app) {
@@ -57,6 +61,7 @@ function Find-ByName($win, $name) {
     throw "elemento non trovato: $name"
 }
 function Click-Real($el) {
+    [void][PN.Native]::SetWindowPos([IntPtr]$script:topHwnd, [IntPtr](-1), 0, 0, 0, 0, 0x13)   # HWND_TOPMOST, senza spostare né attivare
     $r = $el.Current.BoundingRectangle
     [void][PN.Native]::SetCursorPos([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
     Start-Sleep -Milliseconds 200
@@ -71,6 +76,11 @@ function Shot($win, $path) {
     [void][PN.Native]::PrintWindow([IntPtr]$win.Current.NativeWindowHandle, $hdc, 2)
     $g.ReleaseHdc($hdc); $g.Dispose()
     $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+}
+function Wait-State($win, $want, $ms = 4000) {
+    $end = [DateTime]::Now.AddMilliseconds($ms); $s = $null
+    while ([DateTime]::Now -lt $end) { $e = Try-Find $win 'Modalità scura' 500; if ($e) { $s = Toggle-State $e; if ($s -eq $want) { return $s } }; Start-Sleep -Milliseconds 100 }
+    return $s
 }
 function Toggle-State($el) { $el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState.ToString() }
 
@@ -87,7 +97,7 @@ try {
         if ($cur -and (Toggle-State $cur) -eq 'Off') { break }
         if ($cur) { Click-Real $cur }
     }
-    $res.afterClickState = Toggle-State (Try-Find $app.Win 'Modalità scura' 4000)
+    $res.afterClickState = Wait-State $app.Win 'Off'
     Shot $app.Win (Join-Path $OutDir 'powers-chiaro.png')
 } finally { Stop-App $app }
 $res.savedJson = if (Test-Path $settings) { [IO.File]::ReadAllText($settings) } else { '' }
