@@ -8,21 +8,24 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Stampa (paginatore sul layout, finestra di stampa di sistema) — verificato con scrittura XPS dal paginatore nell'autotest UI; la stampa su carta reale non è stata provata
 - [x] **P0** Annulla / Ripeti (istantanee XML, digitazione raggruppata)
 - [x] **P0** Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click — test sessione + autotest UI
-- [ ] **P1** Tema scuro/chiaro commutabile — implementato, verificato solo con screenshot
+- [x] **P0** Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito) — test con mouse reale, screenshot dei due temi, riavvio, file corrotto
+- [x] **P1** Appunti con formattazione (frammento OOXML + testo) — test sessione; tra documenti le immagini sono omesse
+- [x] **P1** Casella Cerca del titolo: esegue comandi o cerca nel testo — autotest UI
+- [x] **P0** Intestazione/piè di pagina modificabili sul foglio (doppio clic, Esc) — test sessione + autotest UI
 - [ ] **P2** Salvataggio con password, firma, versioni
 
 ## Scheda Home
 
 ### Appunti
-- [x] **P0** Incolla — testo semplice
-- [x] **P0** Taglia — testo semplice
-- [x] **P0** Copia — testo semplice
+- [x] **P0** Incolla — testo e formattazione (tra documenti di PowerNotes)
+- [x] **P0** Taglia — idem
+- [x] **P0** Copia — idem
 - [ ] **P1** Copia formato
 - [ ] **P2** Appunti di Office...
 
 ### Carattere
-- [ ] **P0** Ingrandisci carattere
-- [ ] **P0** Riduci carattere
+- [x] **P0** Ingrandisci carattere — passi 8-72
+- [x] **P0** Riduci carattere — passi 8-72
 - [ ] **P1** Cancella formattazione
 - [x] **P0** Grassetto
 - [x] **P0** Corsivo
@@ -30,7 +33,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Barrato
 - [x] **P0** Pedice
 - [x] **P0** Apice
-- [ ] **P0** Carattere...
+- [x] **P0** Carattere... — finestra Carattere completa (launcher del gruppo)
 - [x] **P0** Colore evidenziatore testo
 - [x] **P0** Colore carattere
 - [x] **P0** Tipo di carattere
@@ -61,7 +64,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ### Modifica
 - [x] **P0** Trova
 - [x] **P0** Sostituisci...
-- [ ] **P1** Seleziona
+- [x] **P0** Seleziona — Seleziona tutto
 
 ### Voce
 - [ ] **P2** Dettatura
@@ -152,8 +155,8 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Margini — in Imposta pagina
 - [x] **P0** Orientamento
 - [x] **P0** Dimensioni — A4, A5, Letter, Legal
-- [ ] **P0** Colonne — solo rendering (test del corpus); nessun comando
-- [ ] **P0** Interruzioni — interruzione di pagina sì; interruzione di sezione solo letta/mostrata
+- [x] **P0** Colonne — menu 1/2/3 colonne uguali
+- [x] **P0** Interruzioni — pagina, sezione pagina successiva, sezione continua
 - [ ] **P1** Numeri di riga
 - [ ] **P1** Sillabazione
 

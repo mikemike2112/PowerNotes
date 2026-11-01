@@ -2,7 +2,7 @@
 import json, io
 inv = json.load(open('docs/word-ribbon-inventory.json', encoding='utf-8-sig'))
 DONE = {  # comando -> nota (implementato E coperto da test)
- 'Incolla': 'testo semplice', 'Taglia': 'testo semplice', 'Copia': 'testo semplice',
+ 'Incolla': 'testo e formattazione (tra documenti di PowerNotes)', 'Taglia': 'idem', 'Copia': 'idem',
  'Grassetto': '', 'Corsivo': '', 'Sottolineato': '', 'Barrato': '', 'Pedice': '', 'Apice': '',
  'Colore carattere': '', 'Colore evidenziatore testo': '', 'Tipo di carattere': '', 'Dimensione carattere': '',
  'Elenchi puntati': '', 'Elenchi numerati': '', 'Elenco a più livelli': 'livelli con Aumenta/Riduci rientro o Tab',
@@ -12,7 +12,7 @@ DONE = {  # comando -> nota (implementato E coperto da test)
  'Interruzione di pagina': '', 'Tabella': 'inserimento, celle unite, righe/colonne', 'Immagini': 'inline PNG/JPEG/GIF/BMP',
  'Intestazione': 'finestra dedicata', 'Piè di pagina': 'finestra dedicata', 'Numero di pagina': 'Pagina X di Y nel piè di pagina',
  'Imposta pagina...': 'formato, orientamento, margini', 'Margini': 'in Imposta pagina', 'Orientamento': '', 'Dimensioni': 'A4, A5, Letter, Legal',
- 'Layout di stampa': 'unica vista', 'Carattere...': 'finestra Carattere completa (launcher del gruppo)', 'Ingrandisci carattere': 'passi 8-72', 'Riduci carattere': 'passi 8-72', 'Colonne': 'menu 1/2/3 colonne uguali', 'Interruzioni': 'pagina, sezione pagina successiva, sezione continua', 'Righello': 'cm, con margini', 'Una pagina': '', 'Larghezza pagina': '', 'Seleziona': 'Seleziona tutto', '100%': '', 'Zoom...': 'pulsanti −/+/100% e Ctrl+rotella',
+ 'Layout di stampa': 'unica vista', 'Carattere...': 'finestra Carattere completa (launcher del gruppo)', 'Ingrandisci carattere': 'passi 8-72', 'Riduci carattere': 'passi 8-72', 'Colonne': 'menu 1/2/3 colonne uguali', 'Interruzioni': 'pagina, sezione pagina successiva, sezione continua', 'Seleziona': 'Seleziona tutto', '100%': '', 'Zoom...': 'pulsanti −/+/100% e Ctrl+rotella',
 }
 P0 = set(DONE) | {'Annulla', 'Ripeti'}
 P1 = {'Cancella formattazione','Mostra tutto','Sfondo','Bordi','Seleziona','Pagina vuota','Collegamento','Segnalibro...','Inserisci nota a piè di pagina','Conteggio parole','Ortografia e Grammatica','Rilevamento modifiche','Nuovo commento','Colonne','Interruzioni','Larghezza pagina','Una pagina','Righello','Sommario','Copia formato','Maiuscole/minuscole','Ordina...','Sillabazione','Numeri di riga','Casella di testo','Forme','Simbolo','Equazione','Commento'}
@@ -31,7 +31,8 @@ for n, ok, pr, note in [
   ('Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click', True, 'P0', 'test sessione + autotest UI'),
   ('Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito)', True, 'P0', 'test con mouse reale, screenshot dei due temi, riavvio, file corrotto'),
   ('Appunti con formattazione (frammento OOXML + testo)', True, 'P1', 'test sessione; tra documenti le immagini sono omesse'),
-  ('Casella Cerca del titolo: esegue comandi o cerca nel testo', True, 'P1', 'verificata a mano'),
+  ('Casella Cerca del titolo: esegue comandi o cerca nel testo', True, 'P1', 'autotest UI'),
+  ('Intestazione/piè di pagina modificabili sul foglio (doppio clic, Esc)', True, 'P0', 'test sessione + autotest UI'),
   ('Salvataggio con password, firma, versioni', False, 'P2', ''),
 ]:
     w(f"- [{'x' if ok else ' '}] **{pr}** {n}" + (f' — {note}' if note else ''))

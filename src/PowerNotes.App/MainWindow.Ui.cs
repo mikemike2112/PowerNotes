@@ -244,7 +244,7 @@ public partial class MainWindow
         void Style(string text, string id, double size, string? color)
         {
             var tb = new TextBlock { Text = text, FontSize = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-            if (color != null) tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+            tb.SetResourceReference(TextBlock.ForegroundProperty, color != null ? "AccentTextBrush" : "TextBrush");
             var b = new Button { Content = tb, Width = 96, Height = 62, Margin = new Thickness(2), BorderBrush = (Brush)FindResource("LineBrush") };
             System.Windows.Automation.AutomationProperties.SetName(b, text);
             b.Click += (_, _) => Do(() => _s.SetStyle(id)); gal.Children.Add(b);

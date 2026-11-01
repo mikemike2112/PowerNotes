@@ -35,11 +35,13 @@ Confrontate a vista 10 file (`mixed-report`, `styles-headings`, `text-formatting
 - `table-merged-cells` dopo la correzione dei RowSpan coincide con Word a vista.
 
 ## Limiti noti (non implementato o semplificato)
-- Spaziatura carattere/kerning/legature ignorati (larghezze da `hmtx`): ±1% sulle lunghezze di riga, nessuna differenza di conta pagine nel corpus.
-- Immagini ancorate/flottanti, caselle di testo, forme: non disegnate (restano nel file). Note a piè di pagina: contenuto conservato, non impaginato.
-- Colonne: rendering a larghezza uguale (corpus coincidente con Word), nessun comando per crearle; interruzioni di sezione: lette e rispettate, nessun comando per inserirle.
-- Righe di tabella che superano una pagina non si spezzano; righe di intestazione ripetute non implementate; stili di tabella condizionali (prima riga, bande) ignorati: sono usati bordi, margini e sfondi diretti o dello stile.
-- Revisioni (tracked changes): il testo inserito è mostrato, il cancellato no; non si possono accettare/rifiutare.
-- Intestazioni/piè di pagina: modifica con finestra (testo + numero di pagina), non nel foglio; prima pagina diversa e pari/dispari letti, non creati.
-- Appunti: solo testo semplice. Nessuna correzione ortografica, nessun campo oltre a PAGE/NUMPAGES.
-- Font `.ttc` (es. Cambria) non incorporati nel PDF: ripiego su Arial in PDF; lo schermo usa il nome di famiglia.
+- Spaziatura carattere e kerning/legature ignorati (larghezze da `hmtx`): ±1% sulle lunghezze di riga, nessuna differenza di conta pagine nel corpus.
+- Oggetti ancorati: immagini e caselle di testo sono **disegnate** alla posizione indicata (pagina, margine, paragrafo; allineamenti); il testo non scorre attorno (`wrapSquare/Tight`), mentre "sopra e sotto" riserva lo spazio solo se ancorato al paragrafo. Forme vettoriali e rotazioni non disegnate (restano nel file).
+- Note a piè di pagina: contenuto conservato, non ancora impaginato.
+- Righe di tabella più alte di una pagina non si spezzano. Intestazioni di tabella ripetute e stili di tabella condizionali (prima/ultima riga e colonna, bande) sono implementati e coperti da test; non confrontati con Word su documenti reali oltre al corpus.
+- Revisioni: il testo inserito è mostrato, il cancellato no; non si possono accettare/rifiutare.
+- Intestazioni/piè di pagina: modifica sul foglio (doppio clic nella zona, Esc per uscire) o dalla finestra dedicata; la prima pagina diversa e pari/dispari sono lette, non create da comandi.
+- Appunti: testo semplice + frammento formattato fra documenti di PowerNotes; da/verso altre applicazioni solo testo semplice.
+- Grassetto/corsivo sintetizzati (doppia stampa/inclinazione) se il font non ha la variante; qualità inferiore a un vero font Bold.
+- Font `.ttc` incorporati nel PDF estraendo il singolo font.
+- Nessuna correzione ortografica, nessun campo oltre a PAGE/NUMPAGES.
