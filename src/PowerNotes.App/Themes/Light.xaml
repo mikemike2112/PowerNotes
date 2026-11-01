@@ -10,4 +10,5 @@
     <SolidColorBrush x:Key="HoverBrush" Color="#e6dede"/>
     <SolidColorBrush x:Key="DeskBrush" Color="#efe9e9"/>
     <SolidColorBrush x:Key="PowerBrush" Color="#FF2400"/>
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#0a6f82"/>
 </ResourceDictionary>
