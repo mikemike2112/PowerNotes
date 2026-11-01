@@ -62,7 +62,7 @@ public sealed class ThemedDialog : Window
         if (primary) { b.SetResourceReference(Control.BorderBrushProperty, "AccentBrush"); b.SetResourceReference(Control.BackgroundProperty, "AccentBrush"); b.Foreground = Brushes.Black; b.FontWeight = FontWeights.SemiBold; _primary = b; }
         else b.SetResourceReference(Control.BorderBrushProperty, "LineBrush");
         if (cancel) _cancel = b;
-        b.Click += (_, _) => { beforeClose?.Invoke(); Result = r; Close(); };
+        b.Click += (_, _) => { if (_keepOpen.Contains(b)) return; beforeClose?.Invoke(); Result = r; Close(); };
         _buttons.Children.Add(b);
         return b;
     }
@@ -143,13 +143,21 @@ public sealed class ThemedDialog : Window
     }
 
     /// <summary>Finestra con contenuto proprio e un solo pulsante «Chiudi».</summary>
-    public static void ShowCustom(Window? owner, string title, string intro, FrameworkElement content, double maxWidth = 680)
+    public static void ShowCustom(Window? owner, string title, string intro, FrameworkElement content, double maxWidth = 680, string? primaryText = null, Action? primaryAction = null)
     {
         var d = new ThemedDialog(owner, title, intro, "dlg-info") { MaxWidth = maxWidth, MinWidth = Math.Min(maxWidth, 560) };
         d._body.Children.Add(content);
-        d.AddButton("Chiudi", MessageBoxResult.OK, true, true);
+        // con un'azione principale: «Chiudi» è secondario e l'azione (che non chiude la finestra) è il pulsante in accento
+        d.AddButton("Chiudi", MessageBoxResult.OK, primaryAction == null, true);
+        if (primaryAction != null && primaryText != null)
+        {
+            var b = d.AddButton(primaryText, MessageBoxResult.None, true, false);
+            b.Click += (_, _) => primaryAction();
+            d._keepOpen.Add(b);
+        }
         d.ShowDialog();
     }
+    readonly HashSet<Button> _keepOpen = new();
 
     /// <summary>Mostra il pannello senza bloccare (solo per screenshot e automazione).</summary>
     public static ThemedDialog PreviewSave(Window owner, string docName, bool topmost = false)
