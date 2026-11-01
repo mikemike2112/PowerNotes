@@ -41,7 +41,7 @@ static class SelfTest
 
     static void ClickButton(MainWindow w, string content)
     {
-        var b = Find<ButtonBase>(w, x => x.Content is string s && s == content) ?? Find<ButtonBase>(w, x => x.Content is TextBlock t && t.Text == content);
+        var b = Find<ButtonBase>(w, x => System.Windows.Automation.AutomationProperties.GetName(x) == content);
         if (b == null) { Check(false, $"pulsante '{content}' trovato"); return; }
         b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
     }
@@ -76,7 +76,7 @@ static class SelfTest
         Check(s.Caret.Off is >= 2 and <= 4, $"click posiziona il caret (offset {s.Caret.Off})");
         v.ClickAt(pt, false, 2); await Idle();
         Check(s.HasSelection && s.SelectedText() == "Titolo", $"doppio click seleziona la parola ('{s.SelectedText()}')");
-        ClickButton(w, "G"); await Idle();
+        ClickButton(w, "Grassetto"); await Idle();
         Check(s.AllRuns(f => f.Bold), "pulsante Grassetto applica alla selezione");
         // stile Titolo 1 dalla galleria (interazione con ComboBox)
         s.SetCaret(p0, 0); v.Refresh();
@@ -87,15 +87,15 @@ static class SelfTest
         // elenco puntato sugli ultimi due paragrafi: selezione per click+shift
         var ps = w.Session.Paragraphs();
         v.ClickAt(v.PointFor(ps[2], 0)!.Value, false); v.ClickAt(v.PointFor(ps[3], 4)!.Value, true); await Idle();
-        ClickButton(w, "•≡"); await Idle();
+        ClickButton(w, "Elenchi puntati"); await Idle();
         Check(s.Layout.Pages[0].Lines.Count(l => l.Segs.Any(x => x.Synthetic)) == 2, "elenco puntato su due paragrafi");
         // frecce, Home/End, Backspace
         KeyDown(v, Key.End); KeyDown(v, Key.Back); await Idle();
         Check(ParaText.Text(w.Session.Paragraphs()[3]) == "Elemento du", "End + Backspace");
         // undo / redo da pulsanti
-        ClickButton(w, "↶"); await Idle();
+        ClickButton(w, "Annulla"); await Idle();
         Check(ParaText.Text(w.Session.Paragraphs()[3]) == "Elemento due", "annulla ripristina il testo");
-        ClickButton(w, "↷"); await Idle();
+        ClickButton(w, "Ripeti"); await Idle();
         Check(ParaText.Text(w.Session.Paragraphs()[3]) == "Elemento du", "ripeti");
         // tabella e unione celle
         s.SetCaret(w.Session.Paragraphs()[1], 0); v.Refresh();
@@ -103,7 +103,7 @@ static class SelfTest
         var cells = w.Doc.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.TableCell>().ToList();
         v.ClickAt(v.PointFor(cells[0].Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>().First(), 0)!.Value, false);
         v.ClickAt(v.PointFor(cells[1].Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>().First(), 0)!.Value, true); await Idle();
-        w.SelectTab(3);
+        w.SelectTab(5); await Idle();
         ClickButton(w, "Unisci celle"); await Idle();
         Check(w.Doc.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.TableRow>().First().Elements<DocumentFormat.OpenXml.Wordprocessing.TableCell>().Count() == 2, "unione di due celle dalla scheda Tabella");
         KeyDown(v, Key.Tab); TextIn(v, "cella"); await Idle();
@@ -118,12 +118,16 @@ static class SelfTest
         all.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle(); fd.Close();
         Check(w.Session.Paragraphs().Any(p => ParaText.Text(p).Contains("Primo capitolo")), "Sostituisci tutto");
         // pagina: orientamento, interruzione di pagina, intestazione e numeri di pagina
-        w.SelectTab(2); ClickButton(w, "Orientamento"); await Idle();
+        w.SelectTab(2); await Idle(); ClickButton(w, "Orientamento"); await Idle();
         Check(s.Layout.Pages[0].Width > s.Layout.Pages[0].Height, "orientamento orizzontale");
-        w.SelectTab(1); s.SetCaret(w.Session.Paragraphs()[^1], ParaText.Length(w.Session.Paragraphs()[^1])); ClickButton(w, "Interruzione di pagina"); await Idle();
-        TextIn(v, "Pagina due"); ClickButton(w, "Numeri di pagina"); await Idle();
+        w.SelectTab(1); await Idle(); s.SetCaret(w.Session.Paragraphs()[^1], ParaText.Length(w.Session.Paragraphs()[^1])); ClickButton(w, "Interruzione di pagina"); await Idle();
+        TextIn(v, "Pagina due"); ClickButton(w, "Numero di pagina"); await Idle();
         Check(s.Layout.Pages.Count == 2 && s.Layout.Pages[1].Prims.OfType<PowerNotes.Core.Layout.TextPrim>().Any(t => t.Text == "2"), "interruzione di pagina e numero di pagina sulla seconda pagina");
         w.SelectTab(0);
+        // casella Cerca del titolo: comando per nome
+        s.SetCaret(w.Session.Paragraphs()[1], 0);
+        var sbx = Find<TextBox>(w, t => t.Name == "SearchBox")!; sbx.Text = "Elenchi numerati"; KeyDown(sbx, Key.Enter); await Idle();
+        Check(s.Layout.Pages[0].Lines.Any(l => l.Segs.Any(x => x.Synthetic && x.Text == "1.")), "casella Cerca esegue il comando 'Elenchi numerati'");
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
         using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");

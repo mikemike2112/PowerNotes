@@ -17,7 +17,7 @@ public sealed class LayoutEngine
     sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public double TabPos; }
     sealed class SegL { public Atom A = null!; public double X; public double W; }
     sealed class LineL { public double NatH; public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
-    sealed class ParaL : Block { public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
+    sealed class ParaL : Block { public Story Story; public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
     sealed class CellL { public double X, W, ContentH, H; public int RowSpan = 1, Col, Span; public List<Block> Content = new(); public string? Fill; public Bdr?[] B = new Bdr?[4]; public bool Continue; public string VAlign = "top"; public double MarT, MarB; }
     sealed class RowL { public TableRow? Src; public double H; public List<CellL> Cells = new(); public bool Exact; }
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
@@ -173,6 +173,9 @@ public sealed class LayoutEngine
         foreach (var e in Flatten(root.ChildElements))
             if (e is Paragraph p) list.Add(BuildPara(p, s.Left + s.Gutter, s.ContentW, null, c));
             else if (e is Table t) list.Add(BuildTable(t, s.Left + s.Gutter, s.ContentW, c));
+        var story = part is HeaderPart ? Story.Header : Story.Footer;
+        void Mark(IEnumerable<Block> bs) { foreach (var b in bs) { if (b is ParaL pl) pl.Story = story; else if (b is TableL tl) foreach (var r in tl.Rows) foreach (var ce in r.Cells) Mark(ce.Content); } }
+        Mark(list);
         return list;
     }
 
@@ -206,7 +209,7 @@ public sealed class LayoutEngine
         }
         _col = 0; _colShift = 0;
         _secPageIdx = first ? 0 : _secPageIdx + 1;
-        _pg = new Page { Index = _res.Pages.Count, Number = _res.Pages.Count + 1, Width = _sec.W, Height = _sec.H };
+        _pg = new Page { Index = _res.Pages.Count, Number = _res.Pages.Count + 1, Width = _sec.W, Height = _sec.H, MarL = _sec.Left + _sec.Gutter, MarR = _sec.Right, MarT = _sec.Top, MarB = _sec.Bottom };
         _res.Pages.Add(_pg);
         _pageSec.Add((_pg, _sec, _secPageIdx));
         double hdrH = StackHeight(BuildHF(HdrFor(_sec, _secPageIdx), _sec, 1, 1));
@@ -343,7 +346,7 @@ public sealed class LayoutEngine
         {
             var l = p.Lines[li];
             double baseY = y + l.Base;
-            var lb = new LineBox { Para = p.P, PageIndex = _pg.Index, Start = l.Start, End = l.End, Y = p.Collapsed ? _lastLineY : y, Height = p.Collapsed ? l.NatH : l.H, Baseline = baseY, Left = p.X + _colShift + l.Left, Right = p.X + _colShift + l.Right, LastOfPara = l.Last };
+            var lb = new LineBox { Para = p.P, PageIndex = _pg.Index, Start = l.Start, End = l.End, Story = p.Story, Y = p.Collapsed ? _lastLineY : y, Height = p.Collapsed ? l.NatH : l.H, Baseline = baseY, Left = p.X + _colShift + l.Left, Right = p.X + _colShift + l.Right, LastOfPara = l.Last };
             foreach (var s in l.Segs)
             {
                 var a = s.A; double x = p.X + _colShift + s.X;

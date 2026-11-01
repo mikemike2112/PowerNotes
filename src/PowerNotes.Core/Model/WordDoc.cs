@@ -12,6 +12,7 @@ public sealed class WordDoc : IDisposable
 {
     public WordprocessingDocument Pkg { get; private set; }
     public string? Path { get; private set; }
+    public Guid Id { get; } = Guid.NewGuid();
     public bool Dirty { get; private set; }
     public int Version { get; private set; }     // incrementa a ogni modifica: invalida il layout
     readonly MemoryStream _ms;

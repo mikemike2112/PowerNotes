@@ -420,3 +420,52 @@ public class EditorTests
         Assert.Equal(20, gap, 1);      // max(20, 12), come Word
     }
 }
+
+public class SectionColumnTests
+{
+    [Fact]
+    public void Columns_And_SectionBreaks_ValidAndLaidOut()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type(string.Join("\n", Enumerable.Repeat("riga di testo piuttosto lunga per riempire le colonne della pagina di prova", 60)));
+        s.SetColumns(2);
+        var lay = d.Layout();
+        var xs = lay.Pages[0].Lines.Select(l => Math.Round(l.Left)).Distinct().ToList();
+        Assert.Equal(2, xs.Count);
+        s.SetColumns(1);
+        s.SetCaret(s.Paragraphs()[3], 5);
+        s.InsertSectionBreak(false);
+        Assert.Equal(2, d.Body.Descendants<SectionProperties>().Count());
+        Assert.True(d.Layout().Pages.Count >= 2);
+        s.InsertSectionBreak(true);
+        Assert.Equal(3, d.Body.Descendants<SectionProperties>().Count());
+        var path = Path.Combine(Path.GetTempPath(), "pn-sec-" + Guid.NewGuid().ToString("N") + ".docx");
+        try { d.Save(path); using var pk = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(path, false); Assert.Empty(new DocumentFormat.OpenXml.Validation.OpenXmlValidator(DocumentFormat.OpenXml.FileFormatVersions.Office2019).Validate(pk)); }
+        finally { File.Delete(path); }
+    }
+}
+
+public class ClipboardTests
+{
+    [Fact]
+    public void Fragment_KeepsFormattingAcrossParagraphsAndDocuments()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type("uno due\ntre quattro");
+        var ps = s.Paragraphs();
+        s.SetCaret(ps[0], 4); s.SetCaret(ps[1], 3, true);
+        s.ToggleBold(); s.SetColor("FF0000");
+        s.SetCaret(ps[0], 4); s.SetCaret(ps[1], 3, true);
+        var frag = s.CopyFragment()!;
+        Assert.Contains("FF0000", frag);
+        var d2 = WordDoc.CreateNew(); var s2 = new EditorSession(d2);
+        s2.Type("AB");
+        s2.SetCaret(s2.Paragraphs()[0], 1);
+        s2.PasteFragment(frag, false);
+        Assert.Equal("Adue\ntreB", string.Join("\n", d2.Paragraphs().Select(ParaText.Text)));
+        var p = d2.Paragraphs()[0]; s2.SetCaret(p, 3);
+        Assert.True(s2.FormatAtCaret().Bold); Assert.Equal("FF0000", s2.FormatAtCaret().Color);
+        s2.Undo();
+        Assert.Equal("AB", string.Join("\n", d2.Paragraphs().Select(ParaText.Text)));
+    }
+}

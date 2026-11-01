@@ -110,7 +110,7 @@ public sealed class DocumentView : FrameworkElement
         for (int i = 0; i < paras.Count; i++) idx[paras[i]] = i;
         var (s, e) = _s.Range;
         int si = (idx.TryGetValue(s.P, out var q1) ? q1 : 0), ei = (idx.TryGetValue(e.P, out var q2) ? q2 : 0);
-        var selBrush = new SolidColorBrush(Color.FromArgb(90, 79, 140, 255));
+        var selBrush = new SolidColorBrush(Color.FromArgb(90, 11, 204, 234));
         LineBox? caretLine = _s.Layout.Locate(_s.Caret.P, _s.Caret.Off);
 
         for (int i = 0; i < L.Pages.Count; i++)
@@ -128,6 +128,7 @@ public sealed class DocumentView : FrameworkElement
                 _cache[i] = g;
             }
             dc.DrawDrawing(g);
+            if (_s.EditingHF) dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)), null, new Rect(0, L.Pages[i].MarT, L.Pages[i].Width, L.Pages[i].Height - L.Pages[i].MarT - L.Pages[i].MarB));
             if (_s.HasSelection)
                 foreach (var l in L.Pages[i].Lines)
                 {
@@ -190,6 +191,10 @@ public sealed class DocumentView : FrameworkElement
         if (_s == null) return false;
         var hit = ToPage(pos);
         if (hit == null) return false;
+        var pg = _s.Layout.Pages[hit.Value.page];
+        bool zoneTop = hit.Value.y < pg.MarT, zoneBottom = hit.Value.y > pg.Height - pg.MarB;
+        if (clickCount == 2 && (zoneTop || zoneBottom) && !_s.EditingHF) { _s.EnterHeaderFooter(zoneTop); Refresh(true); return true; }
+        if (clickCount == 2 && _s.EditingHF && !zoneTop && !zoneBottom) { _s.ExitHeaderFooter(); }
         _s.SetCaretAt(hit.Value.page, hit.Value.x, hit.Value.y, extend);
         if (clickCount == 2) _s.SelectWord();
         else if (clickCount >= 3) { _s.SetCaret(_s.Caret.P, 0); _s.SetCaret(_s.Caret.P, ParaText.Length(_s.Caret.P), true); }
@@ -252,6 +257,7 @@ public sealed class DocumentView : FrameworkElement
             case Key.PageDown: _s.MoveVertical(1, shift, ViewportPt()); break;
             case Key.Home: _s.MoveLineEdge(false, shift, ctrl); break;
             case Key.End: _s.MoveLineEdge(true, shift, ctrl); break;
+            case Key.Escape: _s.ExitHeaderFooter(); break;
             case Key.Back: _s.Backspace(); edit = true; break;
             case Key.Delete: _s.DeleteForward(); edit = true; break;
             case Key.Enter: if (shift) _s.SoftBreak(); else _s.Enter(); edit = true; break;
@@ -265,6 +271,30 @@ public sealed class DocumentView : FrameworkElement
     }
 
     double ViewportPt() => (Scroller?.ViewportHeight ?? 600) / Scale * 0.9;
+
+    /// <summary>Geometria (DIP, nelle coordinate della vista) della pagina del caret, per i righelli.</summary>
+    public (Rect Rect, PowerNotes.Core.Layout.Page Page, double Scale)? CaretPageGeometry()
+    {
+        if (_s == null || _s.Layout.Pages.Count == 0) return null;
+        var l = _s.Layout.Locate(_s.Caret.P, _s.Caret.Off);
+        int i = Math.Clamp(l?.PageIndex ?? 0, 0, _s.Layout.Pages.Count - 1);
+        var (_, _, tops) = Metrics();
+        return (PageRect(i, tops), _s.Layout.Pages[i], Scale);
+    }
+
+    public bool FitPage(double viewportW, double viewportH)
+    {
+        if (_s == null || _s.Layout.Pages.Count == 0) return false;
+        var p = _s.Layout.Pages[0];
+        SetZoom(Math.Min((viewportW - 2 * SideDip) / p.Width, (viewportH - 2 * GapDip) / p.Height) * 72.0 / 96.0);
+        return true;
+    }
+
+    public void FitWidth(double viewportW)
+    {
+        if (_s == null || _s.Layout.Pages.Count == 0) return;
+        SetZoom((viewportW - 2 * SideDip) / _s.Layout.Pages[0].Width * 72.0 / 96.0);
+    }
 
     // ---- stampa/PDF: stessa pipeline ----
     public LayoutResult? Layout => _s?.Layout;

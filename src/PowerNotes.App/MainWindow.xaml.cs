@@ -9,6 +9,7 @@ using Microsoft.Win32;
 using PowerNotes.Core.Edit;
 using PowerNotes.Core.Model;
 using PowerNotes.Core.Pdf;
+using PowerNotes.Core.Settings;
 
 namespace PowerNotes.App;
 
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
     EditorSession _s = null!;
     bool _updating;
     bool _light;
+    AppSettings _settings = new();
     FindDialog? _find;
     static readonly string[] Palette = ["000000", "7F7F7F", "C00000", "FF0000", "FFC000", "FFFF00", "00B050", "00B0F0", "0070C0", "002060", "7030A0", "FFFFFF"];
     static readonly (string Name, HighlightColorValues V)[] Highlights =
@@ -30,15 +32,11 @@ public partial class MainWindow : Window
         View.StateChanged += UpdateUi;
         Scroller.ScrollChanged += (_, _) => View.InvalidateVisual();
         SizeChanged += (_, _) => View.InvalidateVisual();
-        FontBox.ItemsSource = System.Windows.Media.Fonts.SystemFontFamilies.Select(f => f.Source).OrderBy(x => x).ToList();
-        SizeBox.ItemsSource = new[] { "8", "9", "10", "10,5", "11", "12", "14", "16", "18", "20", "24", "28", "36", "48", "72" };
-        LineBox.ItemsSource = new[] { "1,0", "1,15", "1,5", "2,0", "2,5", "3,0" };
-        StyleBox.ItemsSource = BuiltIns.Gallery.Select(g => g.Name).ToList();
-        FontBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Font_Changed(null, EventArgs.Empty); } };
-        SizeBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Size_Changed(null, EventArgs.Empty); } };
-        Ribbon.SelectionChanged += (_, _) => ShowPanel();
+        BuildUi();
         PreviewKeyDown += OnShortcut;
         Closing += (_, e) => { if (!ConfirmDiscard()) e.Cancel = true; };
+        _settings = AppSettings.Load();
+        SetTheme(!_settings.Dark);
         Load(WordDoc.CreateNew());
         Loaded += (_, _) => View.Focus();
     }
@@ -74,7 +72,7 @@ public partial class MainWindow : Window
     {
         var name = _doc.Path == null ? "Documento senza nome" : Path.GetFileName(_doc.Path);
         Title = $"{name}{(_doc.Dirty ? " •" : "")} — PowerNotes";
-        TitleText.Text = name + (_doc.Dirty ? " (modificato)" : "");
+        TitleLabel.Text = $"{Path.GetFileNameWithoutExtension(name)}{(_doc.Dirty ? " •" : "")}  -  PowerNotes";
     }
 
     bool SaveCore(bool saveAs)
@@ -95,7 +93,6 @@ public partial class MainWindow : Window
     }
 
     // ---------- menu File ----------
-    void FileButton_Click(object s, RoutedEventArgs e) { FileMenu.PlacementTarget = FileButton; FileMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom; FileMenu.IsOpen = true; }
     void New_Click(object s, RoutedEventArgs e) { if (ConfirmDiscard()) Load(WordDoc.CreateNew()); }
     void Open_Click(object s, RoutedEventArgs e)
     {
@@ -156,9 +153,27 @@ public partial class MainWindow : Window
     }
 
     // ---------- appunti ----------
-    void Copy() { if (_s.HasSelection) Clipboard.SetText(_s.SelectedText().Replace("\n", "\r\n")); }
-    void Cut() { if (_s.HasSelection) { Clipboard.SetText(_s.Cut().Replace("\n", "\r\n")); } }
-    void Paste() { if (Clipboard.ContainsText()) _s.Type(Clipboard.GetText()); }
+    const string FragFormat = "PowerNotes.Fragment";
+
+    /// <summary>Appunti: testo semplice + frammento formattato (formattazione conservata fra documenti di PowerNotes).</summary>
+    void Copy()
+    {
+        if (!_s.HasSelection) return;
+        var data = new DataObject();
+        data.SetText(_s.SelectedText().Replace(((char)10).ToString(), ((char)13).ToString() + (char)10));
+        if (_s.CopyFragment() is { } frag) data.SetData(FragFormat, _doc.Id + "|" + frag);
+        Clipboard.SetDataObject(data, true);
+    }
+    void Cut() { if (!_s.HasSelection) return; Copy(); _s.DeleteSelection(); }
+    void Paste()
+    {
+        if (Clipboard.GetData(FragFormat) is string f && f.IndexOf('|') is var i and > 0)
+        {
+            try { _s.PasteFragment(f[(i + 1)..], f[..i] == _doc.Id.ToString()); return; }
+            catch (InvalidOperationException) { /* frammento non valido: ripiego sul testo */ }
+        }
+        if (Clipboard.ContainsText()) _s.Type(Clipboard.GetText());
+    }
     void Copy_Click(object s, RoutedEventArgs e) => Do(Copy);
     void Cut_Click(object s, RoutedEventArgs e) => Do(Cut);
     void Paste_Click(object s, RoutedEventArgs e) => Do(Paste);
@@ -333,17 +348,12 @@ public partial class MainWindow : Window
         _light = light;
         Application.Current.Resources.MergedDictionaries[0] = new ResourceDictionary { Source = new Uri(light ? "Themes/Light.xaml" : "Themes/Dark.xaml", UriKind.Relative) };
         View.PaperShadow = new SolidColorBrush(Color.FromArgb(light ? (byte)40 : (byte)90, 0, 0, 0));
-        View.InvalidateVisual();
+        View.InvalidateVisual(); HRuler?.InvalidateVisual(); VRuler?.InvalidateVisual();
+        if (_printViewBtn != null) _printViewBtn.SetResourceReference(Control.BackgroundProperty, "HoverBrush");
+        if (DarkSwitch != null) DarkSwitch.IsChecked = !light;
     }
 
-    void ShowPanel()
-    {
-        var panels = new[] { HomePanel, InsertPanel, LayoutPanel, TablePanel, ViewPanel };
-        int i = Ribbon.SelectedIndex;
-        for (int k = 0; k < panels.Length; k++) panels[k].Visibility = k == i ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    public void SelectTab(int i) { Ribbon.SelectedIndex = i; ShowPanel(); }
+    public bool IsLight => _light;
 
     /// <summary>Solo per le schermate di documentazione: seleziona i primi n caratteri del primo paragrafo non vuoto.</summary>
     public void ApplyDemoSelection(int n)
@@ -374,12 +384,13 @@ public partial class MainWindow : Window
             var sid = _s.Styles.Find(pf.StyleId);
             var gi = Array.FindIndex(BuiltIns.Gallery, g => string.Equals(g.WordName, sid?.StyleName?.Val?.Value, StringComparison.OrdinalIgnoreCase) || (g.Id == "Normal" && sid?.Default?.Value == true));
             StyleBox.SelectedIndex = gi >= 0 ? gi : (pf.StyleId == null ? 0 : -1);
-            TableTab.Visibility = _s.InTable ? Visibility.Visible : Visibility.Collapsed;
-            if (!_s.InTable && Ribbon.SelectedIndex == 3) Ribbon.SelectedIndex = 0;
+            SetTableTab(_s.InTable);
+            UpdateRulers();
             PageText.Text = $"Pagina {View.CaretPage} di {View.PageCount}";
             if (_wcVersion != _doc.Version) { _wcVersion = _doc.Version; _wc = _s.Paragraphs().Sum(p => ParaText.Text(p).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length); }
             WordsText.Text = $"{_wc} parole";
-            ZoomText.Text = $"{View.Zoom * 100:0}%";
+            UpdateZoomUi();
+            var lm = pf.LineRule == "auto" ? pf.Line / 240 : 0; LineBox.SelectedItem = ((string[])LineBox.ItemsSource).OrderBy(x => Math.Abs(double.Parse(x.Replace(',', '.'), CultureInfo.InvariantCulture) - lm)).First() is var near && Math.Abs(double.Parse(near.Replace(',', '.'), CultureInfo.InvariantCulture) - lm) < 0.02 ? near : null;
             UpdateTitle();
         }
         catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { PageText.Text = "Errore di visualizzazione: " + ex.Message; }

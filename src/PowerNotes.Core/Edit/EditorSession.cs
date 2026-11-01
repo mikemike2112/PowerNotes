@@ -47,10 +47,46 @@ public sealed class EditorSession
         }
     }
 
+    OpenXmlElement? _storyRoot; Pos _bodyCaret;
+    /// <summary>True mentre si modifica un'intestazione o un piè di pagina direttamente sul foglio.</summary>
+    public bool EditingHF => _storyRoot != null;
+    public bool EditingHeader => _storyRoot is Header;
+
     public List<Paragraph> Paragraphs()
     {
-        if (_paras == null || _parasVer != Doc.Version) { _paras = Doc.Paragraphs(); _parasVer = Doc.Version; }
+        if (_paras == null || _parasVer != Doc.Version || _parasRoot != _storyRoot)
+        {
+            _paras = _storyRoot == null ? Doc.Paragraphs() : _storyRoot.Descendants<Paragraph>().Where(p => !p.Ancestors<Run>().Any()).ToList();
+            _parasVer = Doc.Version; _parasRoot = _storyRoot;
+        }
         return _paras;
+    }
+    OpenXmlElement? _parasRoot;
+
+    /// <summary>Doppio clic nella zona dell'intestazione/piè di pagina: crea la parte se manca ed entra in modifica sul foglio.</summary>
+    public void EnterHeaderFooter(bool header)
+    {
+        if (EditingHF) ExitHeaderFooter();
+        var main = Doc.Pkg.MainDocumentPart!;
+        var sp = SectionFor(Caret.P);
+        var part = FindHF(sp, header);
+        if (part == null) { SetHeaderFooter(header, "", Align.Left, PageNumFormat.None); part = FindHF(sp, header); }
+        OpenXmlElement? root = header ? (part as HeaderPart)?.Header : (OpenXmlElement?)(part as FooterPart)?.Footer;
+        if (root == null) return;
+        _bodyCaret = Caret;
+        _storyRoot = root;
+        var first = root.Descendants<Paragraph>().First();
+        Pending = null; Caret = Anchor = new Pos(first, 0);
+        _paras = null; Doc.Touched();
+    }
+
+    public void ExitHeaderFooter()
+    {
+        if (!EditingHF) return;
+        _storyRoot = null; _paras = null;
+        var ps = Paragraphs();
+        var back = ps.Contains(_bodyCaret.P) ? _bodyCaret : new Pos(ps[0], 0);
+        Caret = Anchor = back; Pending = null; Doc.Touched();
     }
 
     public StyleResolver Styles
@@ -83,7 +119,7 @@ public sealed class EditorSession
 
     public void SetCaretAt(int page, double x, double y, bool extend = false)
     {
-        var hit = Layout.HitTest(page, x, y);
+        var hit = Layout.HitTest(page, x, y, EditingHF);
         if (hit == null) return;
         Set(new Pos(hit.Value.Para, hit.Value.Offset), extend);
         _preferPrev = hit.Value.Offset == hit.Value.Line.End && !hit.Value.Line.LastOfPara;
@@ -234,6 +270,53 @@ public sealed class EditorSession
 
     public string Cut() { var t = SelectedText(); DeleteSelection(); return t; }
 
+    // ---------- appunti con formattazione ----------
+    /// <summary>Frammento OOXML (paragrafi ritagliati sulla selezione, con pPr e rPr) per l'incolla formattato. Null senza selezione.</summary>
+    public string? CopyFragment()
+    {
+        if (!HasSelection) return null;
+        var (s, e) = Range; var ps = Paragraphs(); int i1 = Idx(s.P), i2 = Idx(e.P);
+        var body = new Body();
+        for (int i = i1; i <= i2; i++)
+        {
+            var c = (Paragraph)ps[i].CloneNode(true);
+            c.ParagraphProperties?.SectionProperties?.Remove();
+            int len = ParaText.Length(c);
+            int a = i == i1 ? s.Off : 0, b = i == i2 ? e.Off : len;
+            XmlOps.DeleteRange(c, b, len); XmlOps.DeleteRange(c, 0, a);
+            body.Append(c);
+        }
+        return body.OuterXml;
+    }
+
+    /// <summary>Incolla un frammento prodotto da CopyFragment. sameDocument=false: le immagini (relazioni di un altro documento) vengono omesse.</summary>
+    public void PasteFragment(string xml, bool sameDocument)
+    {
+        Body frag;
+        try { frag = new Body(xml); }
+        catch (Exception ex) when (ex is System.Xml.XmlException or ArgumentException or InvalidOperationException or FormatException) { throw new InvalidOperationException("Appunti non validi.", ex); }
+        var paras = frag.Elements<Paragraph>().Select(p => (Paragraph)p.CloneNode(true)).ToList();
+        if (paras.Count == 0) return;
+        if (!sameDocument) foreach (var p in paras) foreach (var d in p.Descendants<Drawing>().ToList()) { var r = d.Ancestors<Run>().FirstOrDefault(); (r ?? (OpenXmlElement)d).Remove(); }
+        Begin();
+        if (HasSelection) DeleteSelectionCore();
+        var cur = Caret.P; int off = Caret.Off;
+        var tail = XmlOps.Split(cur, off);
+        IEnumerable<OpenXmlElement> Content(Paragraph p) => p.ChildElements.Where(c => c is not ParagraphProperties).ToList();
+        foreach (var c in Content(paras[0])) { c.Remove(); cur.Append(c); }
+        Pos end;
+        if (paras.Count == 1) { end = new Pos(cur, ParaText.Length(cur)); XmlOps.Merge(cur, tail); }
+        else
+        {
+            var prev = cur;
+            for (int i = 1; i < paras.Count - 1; i++) { prev.InsertAfterSelf(paras[i]); prev = paras[i]; }
+            var last = paras[^1]; prev.InsertAfterSelf(last);
+            end = new Pos(last, ParaText.Length(last));
+            XmlOps.Merge(last, tail);
+        }
+        Set(end); Changed();
+    }
+
     // ---------- movimento ----------
     public void MoveHorizontal(int dir, bool extend, bool word = false)
     {
@@ -325,6 +408,7 @@ public sealed class EditorSession
     bool Restore(WordDoc.Snap? s)
     {
         if (s == null) return false;
+        _storyRoot = null; _paras = null;
         var ps = Paragraphs();
         if (ps.Count == 0) { EnsureParagraph(); ps = Paragraphs(); }
         Pos P(int i, int o) { var p = ps[Math.Clamp(i, 0, ps.Count - 1)]; return new Pos(p, Math.Clamp(o, 0, ParaText.Length(p))); }
@@ -404,6 +488,18 @@ public sealed class EditorSession
     public void ToggleItalic() { bool on = !AllRuns(f => f.Italic); ApplyRun(r => r.Italic = new Italic { Val = on }); }
     public void ToggleUnderline() { bool on = !AllRuns(f => f.Underline); ApplyRun(r => r.Underline = new Underline { Val = on ? UnderlineValues.Single : UnderlineValues.None }); }
     public void ToggleStrike() { bool on = !AllRuns(f => f.Strike); ApplyRun(r => r.Strike = new Strike { Val = on }); }
+    static readonly double[] SizeSteps = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+
+    /// <summary>Ingrandisci/Riduci carattere: passa al valore successivo/precedente dell'elenco standard.</summary>
+    public void StepSize(bool grow)
+    {
+        double cur = FormatAtCaret().Size;
+        double next = grow ? SizeSteps.FirstOrDefault(x => x > cur + 0.01) : SizeSteps.LastOrDefault(x => x < cur - 0.01);
+        if (next == 0) next = cur;
+        SetSize(next);
+    }
+
+    public void SetCaps(bool on, bool small) => ApplyRun(r => { r.Caps = small ? null : on ? new Caps() : null; r.SmallCaps = small && on ? new SmallCaps() : null; if (!small && !on) r.Caps = null; });
     public void SetFont(string name) => ApplyRun(r => r.RunFonts = new RunFonts { Ascii = name, HighAnsi = name, EastAsia = name, ComplexScript = name });
     public void SetSize(double pt) => ApplyRun(r => { var v = ((int)Math.Round(pt * 2)).ToString(); r.FontSize = new FontSize { Val = v }; r.FontSizeComplexScript = new FontSizeComplexScript { Val = v }; });
     public void SetColor(string? hex) => ApplyRun(r => r.Color = hex == null ? new Color { Val = "auto" } : new Color { Val = hex });
@@ -643,26 +739,43 @@ public sealed class EditorSession
         row.InsertAfterSelf(nr); Changed(); return true;
     }
 
-    public bool AddColumnRight()
+    public bool AddColumnRight() { var c = CellOf(Caret.P); if (c == null) return false; var me = Cells(c.Value.row).First(x => x.Cell == c.Value.cell); return AddColumnAt(c.Value.tbl, me.Col + me.Span, me.Col); }
+    public bool AddColumnLeft() { var c = CellOf(Caret.P); if (c == null) return false; var me = Cells(c.Value.row).First(x => x.Cell == c.Value.cell); return AddColumnAt(c.Value.tbl, me.Col, me.Col); }
+
+    /// <summary>Nuova colonna di griglia all'indice at: le celle unite che la attraversano si allargano, le altre ricevono una cella vuota.</summary>
+    bool AddColumnAt(Table tbl, int at, int widthFrom)
     {
-        var c = CellOf(Caret.P); if (c == null) return false;
         Begin();
-        var tbl = c.Value.tbl; var me = Cells(c.Value.row).First(x => x.Cell == c.Value.cell);
-        int at = me.Col + me.Span;     // nuova colonna di griglia dopo questa
         var grid = tbl.GetFirstChild<TableGrid>()!;
         var cols = grid.Elements<GridColumn>().ToList();
-        int w = int.TryParse(cols[Math.Min(me.Col, cols.Count - 1)].Width?.Value, out var gw) ? gw : 1440;
+        int w = int.TryParse(cols[Math.Min(widthFrom, cols.Count - 1)].Width?.Value, out var gw) ? gw : 1440;
         var ng = new GridColumn { Width = w.ToString() };
-        if (at - 1 < cols.Count) cols[at - 1].InsertAfterSelf(ng); else grid.Append(ng);
+        if (at < cols.Count) cols[at].InsertBeforeSelf(ng); else grid.Append(ng);
         foreach (var row in tbl.Elements<TableRow>())
         {
             var cs = Cells(row);
-            var host = cs.LastOrDefault(x => x.Col < at && x.Col + x.Span >= at);
-            if (host.Cell != null && host.Col + host.Span > at) { var gs = host.Cell.TableCellProperties!.GridSpan ??= new GridSpan { Val = host.Span }; gs.Val = host.Span + 1; continue; }   // cella unita che attraversa: si allarga
+            var cross = cs.FirstOrDefault(x => x.Col < at && x.Col + x.Span > at);
+            if (cross.Cell != null) { var gs = cross.Cell.TableCellProperties!.GridSpan ??= new GridSpan { Val = cross.Span }; gs.Val = cross.Span + 1; continue; }
             var nc = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = w.ToString() }), new Paragraph());
-            if (host.Cell != null) host.Cell.InsertAfterSelf(nc); else row.Append(nc);
+            var before = cs.FirstOrDefault(x => x.Col >= at);
+            if (before.Cell != null) before.Cell.InsertBeforeSelf(nc); else row.Append(nc);
         }
         Changed(); return true;
+    }
+
+    public bool AddRowAbove()
+    {
+        var c = CellOf(Caret.P); if (c == null) return false;
+        Begin();
+        var row = c.Value.row; var nr = new TableRow();
+        if (row.TableRowProperties != null) nr.Append(row.TableRowProperties.CloneNode(true));
+        foreach (var x in Cells(row))
+        {
+            var nc = new TableCell();
+            if (x.Cell.TableCellProperties != null) { var pr = (TableCellProperties)x.Cell.TableCellProperties.CloneNode(true); pr.VerticalMerge = null; nc.Append(pr); }
+            nc.Append(new Paragraph()); nr.Append(nc);
+        }
+        row.InsertBeforeSelf(nr); Changed(); return true;
     }
 
     public bool DeleteRow()
@@ -785,6 +898,45 @@ public sealed class EditorSession
             var m = sp.GetFirstChild<PageMargin>() ?? sp.AppendChild(new PageMargin { Header = 708, Footer = 708, Gutter = 0 });
             m.Top = (int)Math.Round(pi.Top * 20); m.Bottom = (int)Math.Round(pi.Bottom * 20); m.Left = (uint)Math.Round(pi.Left * 20); m.Right = (uint)Math.Round(pi.Right * 20);
         }
+        Changed();
+    }
+
+    /// <summary>Numero di colonne (uguali) della sezione del caret.</summary>
+    public void SetColumns(int n)
+    {
+        if (n < 1 || n > 6) throw new ArgumentOutOfRangeException(nameof(n), "Colonne da 1 a 6.");
+        Begin();
+        var sp = SectionFor(Caret.P);
+        var cols = sp.GetFirstChild<Columns>() ?? sp.AppendChild(new Columns());
+        cols.ColumnCount = (short)n; cols.Space ??= "720"; cols.EqualWidth = true;
+        foreach (var c in cols.Elements<Column>().ToList()) c.Remove();
+        // ordine schema: dopo pgMar/paperSrc/pgBorders/lnNumType/pgNumType, prima di docGrid: riposiziona
+        cols.Remove();
+        var after = sp.Elements().LastOrDefault(e => e is PageMargin or PaperSource or PageBorders or LineNumberType or PageNumberType) ?? sp.Elements().LastOrDefault(e => e is PageSize or HeaderReference or FooterReference or FootnoteProperties or EndnoteProperties or SectionType);
+        if (after != null) after.InsertAfterSelf(cols); else sp.PrependChild(cols);
+        Changed();
+    }
+
+    /// <summary>Interruzione di sezione al caret: pagina successiva o continua.</summary>
+    public void InsertSectionBreak(bool continuous)
+    {
+        Begin();
+        if (HasSelection) DeleteSelectionCore();
+        var cur = SectionFor(Caret.P);
+        var np = XmlOps.Split(Caret.P, Caret.Off);          // il secondo resta dopo
+        var first = Caret.P == np ? np : Caret.P;
+        var brk = new Paragraph(new ParagraphProperties((SectionProperties)cur.CloneNode(true)));
+        var clone = brk.ParagraphProperties!.SectionProperties!;
+        clone.GetFirstChild<SectionType>()?.Remove();
+        first.InsertAfterSelf(brk);
+        // la sezione successiva (quella originale) comincia con il tipo richiesto
+        var t = cur.GetFirstChild<SectionType>() ?? cur.PrependChild(new SectionType());
+        t.Val = continuous ? SectionMarkValues.Continuous : SectionMarkValues.NextPage;
+        // schema: SectionType dopo header/footer reference
+        t.Remove();
+        var lastRef = cur.Elements().LastOrDefault(e => e is HeaderReference or FooterReference or FootnoteProperties or EndnoteProperties);
+        if (lastRef != null) lastRef.InsertAfterSelf(t); else cur.PrependChild(t);
+        Set(new Pos(np, 0));
         Changed();
     }
 

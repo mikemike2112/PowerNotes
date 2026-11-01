@@ -35,6 +35,7 @@ public partial class App : Application
         if (light) w.SetTheme(true);
         w.View.SetZoom(zoom);
         w.SelectTab(tab);
+        if (shot == null && selftest == null) w.WindowState = WindowState.Maximized;
         w.Show();
         if (selftest != null)
         {
