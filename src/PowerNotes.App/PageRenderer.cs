@@ -65,8 +65,11 @@ public static class PageRenderer
                 map.TryGetValue(ch, out var gi);
                 idx.Add(gi); adv.Add(face.AdvanceWidths.TryGetValue(gi, out var a) ? a * size : 0);
             }
-            var run = new GlyphRun(face, 0, false, size, (float)ppd, idx, new Point(t.X, t.Baseline), adv, null, null, null, null, null, null);
-            dc.DrawGlyphRun(brush, run);
+            bool synB = f.Bold && !FontCatalog.HasExact(f.Font, true, f.Italic), synI = f.Italic && !FontCatalog.HasExact(f.Font, f.Bold, true);
+            if (synI) dc.PushTransform(new MatrixTransform(1, 0, -0.2, 1, 0.2 * t.Baseline, 0));   // corsivo sintetizzato
+            dc.DrawGlyphRun(brush, new GlyphRun(face, 0, false, size, (float)ppd, idx, new Point(t.X, t.Baseline), adv, null, null, null, null, null, null));
+            if (synB) dc.DrawGlyphRun(brush, new GlyphRun(face, 0, false, size, (float)ppd, idx, new Point(t.X + size * 0.03, t.Baseline), adv, null, null, null, null, null, null));   // grassetto sintetizzato
+            if (synI) dc.Pop();
             return;
         }
         // ripiego (es. collezioni .ttc): FormattedText con il nome di famiglia

@@ -17,11 +17,13 @@ public sealed class LayoutEngine
     sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public double TabPos; }
     sealed class SegL { public Atom A = null!; public double X; public double W; }
     sealed class LineL { public double NatH; public double H, Base, ExtraPerSpace; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
-    sealed class ParaL : Block { public Story Story; public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
+    sealed class ParaL : Block { public List<FloatL> Floats = new(); public Story Story; public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
     sealed class CellL { public double X, W, ContentH, H; public int RowSpan = 1, Col, Span; public List<Block> Content = new(); public string? Fill; public Bdr?[] B = new Bdr?[4]; public bool Continue; public string VAlign = "top"; public double MarT, MarB; }
-    sealed class RowL { public TableRow? Src; public double H; public List<CellL> Cells = new(); public bool Exact; }
+    sealed class RowL { public bool IsHeader; public TableRow? Src; public double H; public List<CellL> Cells = new(); public bool Exact; }
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
     record Bdr(double W, string Color);
+    /// <summary>Oggetto ancorato (immagine o casella di testo): posizione risolta in fase di emissione.</summary>
+    sealed class FloatL { public double W, H, OffX, OffY, Dist; public string HFrom = "column", VFrom = "paragraph"; public string? HAlign, VAlign, Fill, LineColor; public double LineW; public bool Behind; public string Wrap = "none"; public ImagePart? Img; public List<Paragraph>? BoxParas; }
 
     sealed class Ctx
     {
@@ -30,6 +32,7 @@ public sealed class LayoutEngine
         public int PageNo = 1, NumPages = 1;
         public Dictionary<int, int[]> Counters = new();
         public Dictionary<Run, RunFmt> RunCache = new();
+        public Action<RunFmt>? CondRun;   // formattazione condizionale dello stile tabella (prima riga in grassetto, ecc.)
     }
 
     sealed class SectInfo
@@ -318,6 +321,8 @@ public sealed class LayoutEngine
     void PlaceTable(TableL t)
     {
         int n = t.Rows.Count, r = 0;
+        int hdr = 0; while (hdr < n && t.Rows[hdr].IsHeader) hdr++;      // righe di intestazione ripetute
+        double hdrH = t.Rows.Take(hdr).Sum(x => x.H);
         while (r < n)
         {
             int end = r;
@@ -325,7 +330,11 @@ public sealed class LayoutEngine
             for (int j = r; j <= end; j++) foreach (var c in t.Rows[j].Cells) end = Math.Max(end, j + c.RowSpan - 1);
             double h = 0;
             for (int j = r; j <= end; j++) h += t.Rows[j].H;
-            if (_y + h > _bottom + 0.01 && _pageHasBody) { NewPage(true, false, false); }
+            if (_y + h > _bottom + 0.01 && _pageHasBody)
+            {
+                NewPage(true, false, false);
+                if (hdr > 0 && r >= hdr && hdrH + h < _bottom - _top) { EmitTable(t, 0, hdr, _y); _y += hdrH; }
+            }
             EmitTable(t, r, end + 1, _y);
             _y += h; _pageHasBody = true;
             r = end + 1;
@@ -342,6 +351,8 @@ public sealed class LayoutEngine
 
     void EmitPara(ParaL p, int from, int to, double y)
     {
+        double paraTopY = y;
+        if (from == 0 && p.Floats.Count > 0) EmitFloats(p, y, true);
         for (int li = from; li < to; li++)
         {
             var l = p.Lines[li];
@@ -375,6 +386,7 @@ public sealed class LayoutEngine
             _pg.Lines.Add(lb); _res.Register(lb);
             y += l.H;
         }
+        if (to == p.Lines.Count && p.Floats.Count > 0) EmitFloats(p, paraTopY, false);
     }
 
     void EmitBlocks(List<Block> bs, double y)
@@ -462,6 +474,7 @@ public sealed class LayoutEngine
     ParaL BuildPara(Paragraph p, double x, double width, string? tableStyle, Ctx c)
     {
         var F = c.St.ResolvePara(p, tableStyle, out var mark, out var baseRun);
+        if (c.CondRun != null) { c.CondRun(mark); c.CondRun(baseRun); }
         var para = new ParaL { P = p, F = F, X = x, Width = width, Before = F.Before, After = F.After };
         var atoms = new List<Atom>();
         double indL = F.IndLeft, indR = F.IndRight, first = F.FirstLine;
@@ -512,12 +525,69 @@ public sealed class LayoutEngine
                     }
             }
         }
+        para.Floats = ReadFloats(p, c);
+        // testo "sopra e sotto": lo spazio dell'oggetto ancorato al paragrafo viene riservato prima del testo
+        foreach (var fl in para.Floats.Where(f => f.Wrap == "topBottom" && f.VFrom == "paragraph")) para.Before += fl.H + 2 * fl.Dist;
         BuildLines(para, atoms, mark, indL, indR, first, c);
         // paragrafo che contiene solo un'interruzione di sezione (pagina successiva): Word non gli dedica una riga
         if (atoms.Count == 0 && p.ParagraphProperties?.SectionProperties is { } sp0 && sp0.GetFirstChild<SectionType>()?.Val?.Value != SectionMarkValues.Continuous)
         { para.Collapsed = true; para.Before = para.After = 0; foreach (var ln in para.Lines) ln.H = 0; }
         para.Height = para.Before + para.Lines.Sum(l => l.H) + para.After;
         return para;
+    }
+
+    List<FloatL> ReadFloats(Paragraph p, Ctx c)
+    {
+        var res = new List<FloatL>();
+        foreach (var anchor in p.Descendants().Where(e => e.LocalName == "anchor" && !e.Ancestors<AlternateContentFallback>().Any() && e.Ancestors<Paragraph>().First() == p))
+        {
+            double Emu(string? v) => double.TryParse(v, CultureInfo.InvariantCulture, out var d) ? d / 12700.0 : 0;
+            var ext = anchor.ChildElements.FirstOrDefault(e => e.LocalName == "extent");
+            var f = new FloatL { W = Emu(ext == null ? null : Attr(ext, "cx")), H = Emu(ext == null ? null : Attr(ext, "cy")), Behind = Attr(anchor, "behindDoc") is "1" or "true", Dist = Emu(Attr(anchor, "distT")) };
+            if (f.W <= 0 || f.H <= 0) continue;
+            var ph = anchor.ChildElements.FirstOrDefault(e => e.LocalName == "positionH"); var pv = anchor.ChildElements.FirstOrDefault(e => e.LocalName == "positionV");
+            if (ph != null) { f.HFrom = Attr(ph, "relativeFrom") ?? "column"; f.HAlign = ph.ChildElements.FirstOrDefault(e => e.LocalName == "align")?.InnerText; f.OffX = Emu(ph.ChildElements.FirstOrDefault(e => e.LocalName == "posOffset")?.InnerText); }
+            if (pv != null) { f.VFrom = Attr(pv, "relativeFrom") ?? "paragraph"; f.VAlign = pv.ChildElements.FirstOrDefault(e => e.LocalName == "align")?.InnerText; f.OffY = Emu(pv.ChildElements.FirstOrDefault(e => e.LocalName == "posOffset")?.InnerText); }
+            var wrap = anchor.ChildElements.FirstOrDefault(e => e.LocalName.StartsWith("wrap", StringComparison.Ordinal))?.LocalName;
+            f.Wrap = wrap switch { "wrapTopAndBottom" => "topBottom", "wrapSquare" or "wrapTight" or "wrapThrough" => "square", _ => "none" };
+            var blip = anchor.Descendants<A.Blip>().FirstOrDefault();
+            if (blip?.Embed?.Value is { } rid) { try { f.Img = c.Part.GetPartById(rid) as ImagePart; } catch (ArgumentOutOfRangeException) { } }
+            var tx = anchor.Descendants().FirstOrDefault(e => e.LocalName == "txbxContent");
+            if (tx != null) f.BoxParas = tx.Elements<Paragraph>().ToList();
+            var fillClr = anchor.Descendants().FirstOrDefault(e => e.LocalName == "solidFill" && e.Parent?.LocalName == "spPr")?.Descendants().FirstOrDefault(e => e.LocalName == "srgbClr");
+            f.Fill = fillClr == null ? null : Attr(fillClr, "val");
+            var ln = anchor.Descendants().FirstOrDefault(e => e.LocalName == "ln" && e.Parent?.LocalName == "spPr");
+            if (ln != null) { f.LineW = Emu(Attr(ln, "w")); f.LineColor = ln.Descendants().FirstOrDefault(e => e.LocalName == "srgbClr") is { } lc ? Attr(lc, "val") : null; if (f.LineColor != null && f.LineW <= 0) f.LineW = 0.75; }
+            if (f.Img != null || f.BoxParas != null) res.Add(f);
+        }
+        return res;
+    }
+
+    void EmitFloats(ParaL p, double paraTop, bool behind)
+    {
+        var pg = _pg;
+        foreach (var f in p.Floats.Where(f => f.Behind == behind))
+        {
+            double areaX = f.HFrom is "page" ? 0 : f.HFrom is "margin" or "leftMargin" or "insideMargin" ? pg.MarL : p.X + _colShift;
+            double areaW = f.HFrom is "page" ? pg.Width : f.HFrom is "margin" ? pg.Width - pg.MarL - pg.MarR : p.Width;
+            double x = f.HAlign switch { "center" => areaX + (areaW - f.W) / 2, "right" => areaX + areaW - f.W, "left" => areaX, _ => areaX + f.OffX };
+            double areaY = f.VFrom is "page" or "topMargin" ? 0 : f.VFrom is "margin" ? pg.MarT : paraTop;
+            double areaH = f.VFrom is "page" ? pg.Height : f.VFrom is "margin" ? pg.Height - pg.MarT - pg.MarB : f.H;
+            double y = f.VAlign switch { "center" => areaY + (areaH - f.H) / 2, "bottom" => areaY + areaH - f.H, "top" => areaY, _ => areaY + f.OffY };
+            if (f.Img != null) _pg.Prims.Add(new ImagePrim { X = x, Y = y, W = f.W, H = f.H, Part = f.Img });
+            if (f.BoxParas != null)
+            {
+                if (f.Fill != null) _pg.Prims.Add(new RectPrim { X = x, Y = y, W = f.W, H = f.H, Fill = f.Fill });
+                if (f.LineColor != null) foreach (var (x1, y1, x2, y2) in new[] { (x, y, x + f.W, y), (x, y + f.H, x + f.W, y + f.H), (x, y, x, y + f.H), (x + f.W, y, x + f.W, y + f.H) })
+                    _pg.Prims.Add(new LinePrim { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Width = Math.Max(0.5, f.LineW), Color = f.LineColor });
+                const double inset = 5.4;
+                var ctx = new Ctx { St = _st, Part = _body.Part };
+                var blocks = f.BoxParas.Select(bp => (Block)BuildPara(bp, x + inset, Math.Max(10, f.W - 2 * inset), null, ctx)).ToList();
+                var save = _colShift; _colShift = 0;
+                EmitBlocks(blocks, y + inset);
+                _colShift = save;
+            }
+        }
     }
 
     static void Tokenize(string text, int start, RunFmt f, List<Atom> atoms)
@@ -745,6 +815,20 @@ public sealed class LayoutEngine
         colX[0] = t.X + (_compat15 ? 0 : 0);
         for (int i = 0; i < grid.Count; i++) colX[i + 1] = colX[i] + grid[i];
 
+        // condizioni dello stile tabella (tblStylePr) e opzioni di aspetto (tblLook)
+        var cond = new Dictionary<string, (string? Fill, OpenXmlElement? Brd, OpenXmlElement? RPr)>();
+        foreach (var st in c.St.Chain(sid ?? c.St.DefaultTableStyleId))
+            foreach (var sp in st.ChildElements.Where(x => x.LocalName == "tblStylePr"))
+            {
+                var type = Attr(sp, "type"); if (type == null) continue;
+                var tcPr = Child(sp, "tcPr"); var shd = Child(tcPr, "shd"); var fl = shd != null ? Attr(shd, "fill") : null;
+                cond.TryGetValue(type, out var old);
+                cond[type] = (fl is null or "auto" ? old.Fill : fl, Child(tcPr, "tcBorders") ?? old.Brd, Child(sp, "rPr") ?? old.RPr);
+            }
+        var lk = tp?.ChildElements.FirstOrDefault(x => x.LocalName == "tblLook");
+        int lv = lk != null && int.TryParse(Attr(lk, "val"), System.Globalization.NumberStyles.HexNumber, null, out var lvv) ? lvv : 0x04A0;
+        bool Look(string name, int bit) => lk != null && Attr(lk, name) is { } a ? a is "1" or "true" : (lv & bit) != 0;
+        bool lFirstRow = Look("firstRow", 0x20), lLastRow = Look("lastRow", 0x40), lFirstCol = Look("firstColumn", 0x80), lLastCol = Look("lastColumn", 0x100), lNoH = Look("noHBand", 0x200), lNoV = Look("noVBand", 0x400);
         var open = new Dictionary<int, CellL>();     // colonna → cella con unione verticale aperta
         int nrows = trs.Count;
         for (int ri = 0; ri < nrows; ri++)
@@ -771,27 +855,42 @@ public sealed class LayoutEngine
                     else if (open.TryGetValue(col, out var top)) { top.RowSpan++; cell.Continue = true; }
                 }
                 else open.Remove(col);
+                // formattazione condizionale: dal più generico al più specifico
+                var conds = new List<string> { "wholeTable" };
+                int dataRow = ri - (lFirstRow ? 1 : 0);
+                if (!lNoV) conds.Add(((col - (lFirstCol ? 1 : 0)) % 2 == 0 ? "band1Vert" : "band2Vert"));
+                if (!lNoH && !(lFirstRow && ri == 0) && !(lLastRow && ri == nrows - 1)) conds.Add(dataRow % 2 == 0 ? "band1Horz" : "band2Horz");
+                if (lLastCol && col + span >= grid.Count) conds.Add("lastCol");
+                if (lFirstCol && col == 0) conds.Add("firstCol");
+                if (lLastRow && ri == nrows - 1) conds.Add("lastRow");
+                if (lFirstRow && ri == 0) conds.Add("firstRow");
+                string? cFill = null; OpenXmlElement? cBrd = null; var cRun = new List<OpenXmlElement>();
+                foreach (var cn in conds) if (cond.TryGetValue(cn, out var cv)) { cFill = cv.Fill ?? cFill; cBrd = cv.Brd ?? cBrd; if (cv.RPr != null) cRun.Add(cv.RPr); }
+                cell.Fill = cFill;
+                var condRun = cRun.Count == 0 ? null : (Action<RunFmt>)(f => { foreach (var rp in cRun) c.St.ApplyRPr(f, rp); });
                 // bordi
                 var tcb = Child(cp, "tcBorders");
-                Bdr? Pick(int tblIdx, string[] n, bool edge) => tcb != null && Child(tcb, n) is { } e ? ReadBdr(e) : borders[tblIdx];
+                Bdr? Pick(int tblIdx, string[] n, bool edge) => tcb != null && Child(tcb, n) is { } e ? ReadBdr(e) : cBrd != null && Child(cBrd, edge ? n : [tblIdx == 4 ? "insideH" : "insideV"]) is { } e2 ? ReadBdr(e2) : borders[tblIdx];
                 bool firstRow = ri == 0, lastRow = ri == nrows - 1, firstCol = col == 0, lastCol = col + span >= grid.Count;
                 cell.B[0] = Pick(firstRow ? 0 : 4, ["top"], firstRow);
                 cell.B[2] = Pick(lastRow ? 2 : 4, ["bottom"], lastRow);
                 cell.B[1] = Pick(firstCol ? 1 : 5, ["left", "start"], firstCol);
                 cell.B[3] = Pick(lastCol ? 3 : 5, ["right", "end"], lastCol);
                 if (cp?.Shading?.Fill?.Value is { } fill && fill != "auto") cell.Fill = fill;
+                c.CondRun = condRun;
                 cell.VAlign = cp?.TableCellVerticalAlignment?.Val?.InnerText ?? "top";
                 if (!cell.Continue)
                 {
                     var inner = BuildCellBlocks(tc, cell.X + cml, Math.Max(10, cell.W - cml - cmr), sid, c);
                     cell.Content = inner;
                     cell.ContentH = StackH(inner);
+                    c.CondRun = null;
                 }
                 cell.H = cell.ContentH + cell.MarT + cell.MarB;
                 row.Cells.Add(cell);
                 col += span;
             }
-            row.Src = tr;
+            row.Src = tr; row.IsHeader = tr.TableRowProperties?.GetFirstChild<TableHeader>() != null;
             t.Rows.Add(row);
         }
         // altezze di riga: dopo aver costruito tutte le righe (i RowSpan si conoscono solo a fine tabella)

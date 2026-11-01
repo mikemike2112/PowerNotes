@@ -128,6 +128,12 @@ static class SelfTest
         s.SetCaret(w.Session.Paragraphs()[1], 0);
         var sbx = Find<TextBox>(w, t => t.Name == "SearchBox")!; sbx.Text = "Elenchi numerati"; KeyDown(sbx, Key.Enter); await Idle();
         Check(s.Layout.Pages[0].Lines.Any(l => l.Segs.Any(x => x.Synthetic && x.Text == "1.")), "casella Cerca esegue il comando 'Elenchi numerati'");
+        // intestazione modificabile direttamente sul foglio: doppio clic nella zona dell'intestazione
+        var geo = v.CaretPageGeometry()!.Value;
+        v.ClickAt(new Point(geo.Rect.X + geo.Rect.Width / 2, geo.Rect.Y + geo.Page.MarT * geo.Scale / 2), false, 2); await Idle();
+        Check(s.EditingHF, "doppio clic nella zona intestazione entra in modifica sul foglio");
+        TextIn(v, "Testata prova"); KeyDown(v, Key.Escape); await Idle();
+        Check(!s.EditingHF && s.Layout.Pages[0].Lines.Any(l => l.Story == PowerNotes.Core.Layout.Story.Header && l.Segs.Any(x => x.Text.Contains("Testata"))), "testo digitato nell'intestazione, Esc torna al corpo");
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
         using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");

@@ -13,12 +13,16 @@ sealed class CatalogFontResolver : IFontResolver
     {
         var e = FontCatalog.Resolve(familyName, isBold, isItalic);
         if (e == null) return null;
-        // ponytail: le collezioni .ttc non si incorporano (PDFsharp vuole un font singolo) → ripiego su Arial
-        if (e.File.EndsWith(".ttc", StringComparison.OrdinalIgnoreCase)) e = FontCatalog.Resolve("Arial", isBold, isItalic);
-        return e == null ? null : new FontResolverInfo(e.File);
+        bool simB = isBold && !FontCatalog.HasExact(familyName, true, isItalic), simI = isItalic && !FontCatalog.HasExact(familyName, isBold, true);
+        // le collezioni .ttc si incorporano estraendo il singolo font (nome faccia = "file#indice")
+        return new FontResolverInfo(e.File.EndsWith(".ttc", StringComparison.OrdinalIgnoreCase) ? e.File + "#" + e.Index : e.File, simB, simI);
     }
 
-    public byte[]? GetFont(string faceName) => File.ReadAllBytes(faceName);
+    public byte[]? GetFont(string faceName)
+    {
+        int h = faceName.LastIndexOf('#');
+        return h > 0 ? PowerNotes.Core.Fonts.FontFile.ExtractFromCollection(faceName[..h], int.Parse(faceName[(h + 1)..])) : File.ReadAllBytes(faceName);
+    }
 }
 
 /// <summary>Esporta il risultato del layout in PDF: stessa pipeline dello schermo, testo vettoriale con font incorporati.</summary>
