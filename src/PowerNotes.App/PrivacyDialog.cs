@@ -10,6 +10,14 @@ namespace PowerNotes.App;
 /// <summary>Scudo privacy: mostra cosa trova nel documento aperto (valori reali, una casella per voce) e crea una COPIA ripulita. Il file aperto e l'originale non vengono mai modificati.</summary>
 static class PrivacyDialog
 {
+    /// <summary>Altezza dell'elenco = un numero intero di righe (max 7): nessuna riga tagliata a metà.</summary>
+    static void Snap(StackPanel list, ScrollViewer sv)
+    {
+        double h = 0; int n = 0;
+        foreach (FrameworkElement c in list.Children) { if (n == 7) break; h += c.ActualHeight + c.Margin.Top + c.Margin.Bottom; n++; }
+        if (list.Children.Count > 7) sv.MaxHeight = h; sv.Height = double.NaN;
+    }
+
     public static void Show(Window owner, byte[] currentBytes, string? currentPath, string displayName)
     {
         ScanResult scan;
@@ -27,7 +35,8 @@ static class PrivacyDialog
             AutomationProperties.SetName(cb, $"{f.Label}: {f.Value}");
             boxes.Add((cb, f)); list.Children.Add(cb);
         }
-        root.Children.Add(new ScrollViewer { Content = list, MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        var sv = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        root.Children.Add(sv);
 
         RadioButton? anon = null, remove = null;
         if (scan.Findings.Any(f => f.Kind == PrivacyKind.CommentAuthor))
@@ -44,9 +53,7 @@ static class PrivacyDialog
 
         var result = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0), FontSize = 12.5 };
         result.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush"); AutomationProperties.SetName(result, "Esito");
-        var make = new Button { Content = "Crea copia pulita…", Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, IsEnabled = scan.Findings.Count > 0 };
-        AutomationProperties.SetName(make, "Crea copia pulita"); make.SetResourceReference(Control.BorderBrushProperty, "AccentBrush"); make.BorderThickness = new Thickness(1);
-        make.Click += (_, _) =>
+        Action make = () =>
         {
             var ids = boxes.Where(b => b.Box.IsChecked == true).Select(b => b.F.Id).ToHashSet();
             if (ids.Count == 0) { result.Text = "Seleziona almeno una voce."; return; }
@@ -67,7 +74,8 @@ static class PrivacyDialog
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException) { result.Text = "Copia non creata: " + e.Message; }
         };
-        root.Children.Add(make); root.Children.Add(result);
-        ThemedDialog.ShowCustom(owner, "Scudo privacy", "Analisi del documento aperto, tutto in locale. Il file aperto non viene toccato: si crea una copia.", root);
+        root.Children.Add(result);
+        list.Loaded += (_, _) => Snap(list, sv);
+        ThemedDialog.ShowCustom(owner, "Scudo privacy", "Analisi del documento aperto, tutto in locale. Il file aperto non viene toccato: si crea una copia.", root, 680, scan.Findings.Count > 0 ? "Crea copia pulita…" : null, scan.Findings.Count > 0 ? make : null);
     }
 }

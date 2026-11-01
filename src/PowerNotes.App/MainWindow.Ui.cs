@@ -475,7 +475,7 @@ public partial class MainWindow
     void BuildStatusBar()
     {
         Button V(string icon, bool on, bool enabled) { var b = new Button { Content = Icons.Make(icon, 16), Padding = new Thickness(5, 2, 5, 2), IsEnabled = enabled, ToolTip = enabled ? "Layout di stampa" : Soon }; if (on) { b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); _printViewBtn = b; } ViewBar.Children.Add(b); return b; }
-        V("read", false, false); V("print", true, true); V("web", false, false);
+        V("read", false, false); V("print", true, true);
         var minus = new Button { Content = Icons.Make("close", 10), Padding = new Thickness(4), ToolTip = "Riduci zoom" };
         minus.Content = new TextBlock { Text = "−" }; minus.Click += (_, _) => View.SetZoom(View.Zoom / 1.1);
         var plus = new Button { Content = new TextBlock { Text = "+" }, Padding = new Thickness(4), ToolTip = "Aumenta zoom" }; plus.Click += (_, _) => View.SetZoom(View.Zoom * 1.1);
