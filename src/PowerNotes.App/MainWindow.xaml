@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="clr-namespace:PowerNotes.App"
         Title="PowerNotes" Icon="Assets/powernotes.ico" Width="1500" Height="900" MinWidth="900" MinHeight="500" WindowStartupLocation="CenterScreen"
-        WindowStyle="SingleBorderWindow">
-    <Grid>
+        WindowStyle="SingleBorderWindow" Background="{DynamicResource BgBrush}">
+    <Grid Background="{DynamicResource BgBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- titolo -->
             <RowDefinition Height="Auto"/>   <!-- schede -->
