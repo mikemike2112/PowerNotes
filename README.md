@@ -42,8 +42,8 @@ flowchart LR
 - Undo/redo a istantanee XML delle parti modificate.
 
 ## Stato (numeri reali, ultima esecuzione)
-- Test: 236 superati, 0 falliti, 0 saltati (di cui 87 con Word reale via COM e 2 con l'app reale: autotest e mouse sulla scheda Powers).
-- Corpus Word: 36 file, 36/36 salvati dal clone si riaprono in Word senza ripristino con contenuto identico; conta di pagine = Word su 36/36.
+- Test: 242 superati, 0 falliti, 0 saltati (di cui 90 con Word reale via COM e 2 con l'app reale: autotest e mouse sulla scheda Powers).
+- Corpus Word: 37 file, 37/37 salvati dal clone si riaprono in Word senza ripristino con contenuto identico; conta di pagine = Word su 37/37.
 - Limiti noti: vedi COMPAT.md. Voci non completate: vedi FEATURES.md (nessuna: finestra Carattere, ingrandisci/riduci, colonne e interruzioni di sezione ora presenti).
 
 Dipendenze: [THIRD_PARTY.md](THIRD_PARTY.md) (PDFsharp bloccato a 6.2.4, le versioni da 6.5 sono AGPL).

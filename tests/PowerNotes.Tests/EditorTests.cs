@@ -568,3 +568,19 @@ public class FloatingObjectTests
         finally { File.Delete(png); }
     }
 }
+
+public class BatchTests
+{
+    [Fact]
+    public void Batch_IsOneUndoStep()
+    {
+        var d = WordDoc.CreateNew(); var s = new EditorSession(d);
+        s.Type("abc"); s.SelectAll();
+        s.Batch(() => { s.SetFont("Arial"); s.SetSize(20); s.ToggleBold(); s.SetColor("FF0000"); });
+        Assert.True(s.FormatAtCaret().Bold);
+        s.Undo();                                        // un solo annulla riporta tutto
+        s.SelectAll(); var f = s.FormatAtCaret();
+        Assert.False(f.Bold); Assert.NotEqual(20, f.Size); Assert.Null(f.Color);
+        Assert.Equal("abc", string.Join("", d.Paragraphs().Select(ParaText.Text)));
+    }
+}

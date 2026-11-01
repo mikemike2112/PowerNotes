@@ -134,6 +134,15 @@ static class SelfTest
         Check(s.EditingHF, "doppio clic nella zona intestazione entra in modifica sul foglio");
         TextIn(v, "Testata prova"); KeyDown(v, Key.Escape); await Idle();
         Check(!s.EditingHF && s.Layout.Pages[0].Lines.Any(l => l.Story == PowerNotes.Core.Layout.Story.Header && l.Segs.Any(x => x.Text.Contains("Testata"))), "testo digitato nell'intestazione, Esc torna al corpo");
+        // appunti di Windows: copia formattata -> clipboard reale -> incolla
+        var pc = w.Session.Paragraphs()[0]; s.SetCaret(pc, 0); s.SetCaret(pc, 4, true);
+        w.SelectTab(0); await Idle(); ClickButton(w, "Copia");
+        await Idle();
+        Check(Clipboard.ContainsText() && Clipboard.GetText().Length == 4 && Clipboard.GetData("PowerNotes.Fragment") is string, "copia: testo e frammento formattato negli appunti di Windows");
+        s.SetCaret(w.Session.Paragraphs()[^1], 0); ClickButton(w, "Incolla"); await Idle();
+        Check(ParaText.Text(w.Session.Paragraphs()[^1]).StartsWith(Clipboard.GetText()), "incolla dagli appunti di Windows");
+        // finestra Carattere: stesso effetto del dialogo applicato in un'unica azione di annullamento
+        s.SetCaret(pc, 0); s.SetCaret(pc, 4, true);
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
         using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");

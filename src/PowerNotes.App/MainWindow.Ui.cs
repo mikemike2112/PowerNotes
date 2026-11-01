@@ -405,7 +405,7 @@ public partial class MainWindow
         if (!double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var size) || size < 1 || size > 1638) { MessageBox.Show(this, "Dimensione non valida (1-1638).", "Carattere"); return; }
         var col = v[3].Trim().TrimStart('#');
         if (col.Length != 0 && (col.Length != 6 || !col.All(Uri.IsHexDigit))) { MessageBox.Show(this, "Colore non valido: usa 6 cifre esadecimali.", "Carattere"); return; }
-        Do(() =>
+        Do(() => _s.Batch(() =>
         {
             _s.SetFont(v[0].Trim()); _s.SetSize(size);
             bool b = v[1].StartsWith("Grassetto"), i = v[1].EndsWith("corsivo") || v[1] == "Corsivo";
@@ -415,7 +415,7 @@ public partial class MainWindow
             _s.SetVertAlign(v[6] == "Apice" ? 1 : v[6] == "Pedice" ? -1 : 0);
             _s.SetCaps(v[7] != "Normale", v[7] == "Maiuscoletto");
             _s.SetColor(col.Length == 0 ? null : col.ToUpperInvariant());
-        });
+        }));
     }
 
     // ---------------------------------------------------------------- stato

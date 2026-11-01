@@ -8,7 +8,7 @@ namespace PowerNotes.Tests;
 public class PowersUiTest
 {
     [Fact]
-    public void Switch_ChangesTheme_Persists_AndCorruptSettingsDoNotCrash()
+    public async Task Switch_ChangesTheme_Persists_AndCorruptSettingsDoNotCrash()
     {
         var exe = Directory.GetFiles(Path.Combine(TestPaths.Root, "src", "PowerNotes.App", "bin"), "PowerNotes.exe", SearchOption.AllDirectories).OrderByDescending(File.GetLastWriteTimeUtc).First();
         var dir = Path.Combine(TestPaths.Root, "artifacts", "powers"); var json = Path.Combine(dir, "result.json");
@@ -17,7 +17,7 @@ public class PowersUiTest
         using var p = Process.Start(psi)!;
         var err = p.StandardError.ReadToEndAsync();
         if (!p.WaitForExit(240_000)) { p.Kill(true); Assert.Fail("test UI Powers oltre il tempo limite"); }
-        Assert.True(File.Exists(json), "nessun risultato: " + err.Result);
+        Assert.True(File.Exists(json), "nessun risultato: " + await err);
         var r = JsonDocument.Parse(File.ReadAllText(json)).RootElement;
         Assert.Equal("On", r.GetProperty("firstRunState").GetString());        // predefinito scuro
         Assert.Equal("Off", r.GetProperty("afterClickState").GetString());     // clic reale → chiaro

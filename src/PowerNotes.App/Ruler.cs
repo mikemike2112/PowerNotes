@@ -7,7 +7,7 @@ namespace PowerNotes.App;
 public sealed class Ruler : FrameworkElement
 {
     public bool Vertical { get; set; }
-    double _origin, _scale = 1.3333, _start, _len, _m0, _m1;
+    double _scale = 1.3333, _start, _len, _m0, _m1;
 
     /// <param name="pageStart">posizione DIP del bordo pagina nella coordinata del righello</param>
     public void Set(double pageStart, double scale, double lenPt, double marginStartPt, double marginEndPt)

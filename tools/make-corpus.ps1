@@ -90,6 +90,11 @@ $sc['table-borders-shading'] = { param($w,$d,$s)
   1..3 | % { $t.Cell(1,[int]$_).Shading.BackgroundPatternColor=15849925; $t.Cell(1,[int]$_).Range.Font.Bold=1 }
   $t.Cell(2,2).Shading.BackgroundPatternColor=13421823; $t.Cell(2,3).Range.ParagraphFormat.Alignment=2
   $s.EndKey(6) | Out-Null; P $s '' }
+$sc['table-style-header-repeat'] = { param($w,$d,$s)
+  $t=$d.Tables.Add($s.Range,70,3); try { $t.Style='Tabella griglia 4 - colore 1' } catch { $t.Borders.Enable=$true }
+  1..70 | % { $r=$_; 1..3 | % { $t.Cell($r,[int]$_).Range.Text="R$r C$_" } }
+  $t.Rows.Item(1).HeadingFormat=-1
+  $s.EndKey(6) | Out-Null; P $s 'Fine' }
 $sc['table-nested'] = { param($w,$d,$s)
   $t=$d.Tables.Add($s.Range,2,2); $t.Borders.Enable=$true
   $t.Cell(1,1).Range.Text='Esterna 1'; $t.Cell(1,2).Range.Text='Esterna 2'; $t.Cell(2,1).Range.Text='Esterna 3'
