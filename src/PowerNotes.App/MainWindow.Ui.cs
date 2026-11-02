@@ -27,7 +27,10 @@ public partial class MainWindow
     Button? _maxBtn;
     readonly List<(string Label, Action Act, Button Btn)> _cmds = new();
     int _tab;
-    Button? _printViewBtn;
+    Button? _printViewBtn, _readBtn, _readBtnRibbon, _printBtnRibbon;
+    CheckBox? _rulerChk;
+    bool _read;
+    int _navVer = -1;
     const string Soon = "Non ancora disponibile";
 
     // ---------------------------------------------------------------- costruzione
@@ -38,6 +41,7 @@ public partial class MainWindow
         StateChanged += (_, _) => ((FrameworkElement)Content).Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
         View.Scroller = Scroller;
         View.LinkClicked += OpenLink;
+        NavList.SelectionChanged += NavList_Selected;
 
         BuildTitleBar();
         BuildRibbon();
@@ -207,7 +211,7 @@ public partial class MainWindow
     void RunSearch(string q)
     {
         if (q.Length == 0) return;
-        var hit = _cmds.FirstOrDefault(c => c.Btn.IsEnabled && c.Label.Contains(q, StringComparison.OrdinalIgnoreCase));
+        var hit = _read ? default : _cmds.FirstOrDefault(c => c.Btn.IsEnabled && c.Label.Contains(q, StringComparison.OrdinalIgnoreCase));
         if (hit.Act != null) { Do(hit.Act); return; }
         if (!_s.FindNext(q, false)) ThemedDialog.Show(this, "Nessun comando né testo trovato per \"" + q + "\".", "Cerca");
         View.Refresh(true);
@@ -324,7 +328,7 @@ public partial class MainWindow
         var ro = new StackPanel();
         var brk = Small(ro, "Interruzioni", "breaks", () => { });
         brk.Click += (_, _) => Menu(brk, ("Interruzione di pagina", () => Do(() => _s.InsertPageBreak())), ("Sezione: pagina successiva", () => Do(() => _s.InsertSectionBreak(false))), ("Sezione: continua", () => Do(() => _s.InsertSectionBreak(true))));
-        Stub(ro, "Numeri di riga", "generic"); g.Children.Add(ro);
+        MenuBtn(ro, "Numeri di riga", "generic", false, ("Nessuno", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.None))), ("Continui", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.Continuous))), ("Riavvia a ogni pagina", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.RestartPage))), ("Riavvia a ogni sezione", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.RestartSection)))); g.Children.Add(ro);
         g = Group(lay, "Paragrafo", () => ParaDialog_Click(this, new RoutedEventArgs()));
         TextBox Num(string tip) { var t = new TextBox { Width = 58, Height = 22, ToolTip = tip, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 1, 2, 1) }; System.Windows.Automation.AutomationProperties.SetName(t, tip); return t; }
         _indL = Num("Rientro a sinistra (cm)"); _indR = Num("Rientro a destra (cm)"); _spB = Num("Spaziatura prima (pt)"); _spA = Num("Spaziatura dopo (pt)");
@@ -344,20 +348,22 @@ public partial class MainWindow
         // ====== Visualizza
         var vw = NewTab("Visualizza");
         g = Group(vw, "Visualizzazioni");
-        Stub(g, "Modalità di lettura", "read", true);
-        var lp = Large(g, "Layout di stampa", "print", () => { }); lp.SetResourceReference(Control.BackgroundProperty, "HoverBrush");
+        _readBtnRibbon = Large(g, "Modalità di lettura", "read", () => SetReadMode(true), "Modalità di lettura: nasconde il ribbon, solo lettura (Esc per uscire)");
+        _printBtnRibbon = Large(g, "Layout di stampa", "print", () => SetReadMode(false), "Layout di stampa (modifica)"); Mark(_printBtnRibbon, true);
         g = Group(vw, "Mostra");
-        var rul = new CheckBox { Content = "Righello", IsChecked = true, Margin = new Thickness(4, 4, 4, 4) };
+        var rul = _rulerChk = new CheckBox { Content = "Righello", IsChecked = true, Margin = new Thickness(4, 4, 4, 4) };
         rul.Click += (_, _) => { var v = rul.IsChecked == true ? Visibility.Visible : Visibility.Collapsed; HRuler.Visibility = v; VRuler.Visibility = v; };
-        var grid = new CheckBox { Content = "Griglia", IsEnabled = false, ToolTip = Soon, Margin = new Thickness(4) };
-        var nav = new CheckBox { Content = "Riquadro di spostamento", IsEnabled = false, ToolTip = Soon, Margin = new Thickness(4) };
+        var grid = new CheckBox { Content = "Griglia", Margin = new Thickness(4), ToolTip = "Linee ogni 0,5 cm sulla pagina (solo a schermo)" };
+        grid.Click += (_, _) => { View.ShowGrid = grid.IsChecked == true; View.InvalidateVisual(); };
+        var nav = new CheckBox { Content = "Riquadro di spostamento", Margin = new Thickness(4), ToolTip = "Elenco dei titoli del documento: un clic porta il cursore lì" };
+        nav.Click += (_, _) => ToggleNav(nav.IsChecked == true);
         g.Children.Add(Col(rul, grid, nav));
         g = Group(vw, "Zoom");
         Large(g, "Zoom", "zoom", () => ZoomDialog());
-        Large(g, "100%", "zoom100", () => View.SetZoom(1));
+        Large(g, "100%", "zoom100", () => { View.SetPagesPerRow(1); View.SetZoom(1); });
         var zz = new StackPanel();
         Small(zz, "Una pagina", "onepage", () => View.FitPage(Scroller.ViewportWidth, Scroller.ViewportHeight));
-        Stub(zz, "Più pagine", "onepage");
+        Small(zz, "Più pagine", "onepage", () => View.FitPages(Scroller.ViewportWidth, 2), "Affianca due pagine");
         Small(zz, "Larghezza pagina", "pagewidth", () => View.FitWidth(Scroller.ViewportWidth));
         g.Children.Add(zz);
 
@@ -434,6 +440,44 @@ public partial class MainWindow
 
     /// <summary>Evidenzia un pulsante a interruttore.</summary>
     static void Mark(Control b, bool on) { if (on) b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); else b.ClearValue(Control.BackgroundProperty); }
+
+    /// <summary>Modalità di lettura (solo lettura, senza ribbon né righelli) o ritorno al layout di stampa.</summary>
+    void SetReadMode(bool on)
+    {
+        if (_read == on) return;
+        _read = on; View.ReadOnly = on;
+        var v = on ? Visibility.Collapsed : Visibility.Visible;
+        TabRow.Visibility = v; RibbonFrame.Visibility = v;
+        var rv = !on && _rulerChk?.IsChecked != false ? Visibility.Visible : Visibility.Collapsed;
+        HRuler.Visibility = rv; VRuler.Visibility = rv;
+        foreach (var b in new[] { _readBtn, _readBtnRibbon }) if (b != null) Mark(b, on);
+        foreach (var b in new[] { _printViewBtn, _printBtnRibbon }) if (b != null) Mark(b, !on);
+        if (on) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => View.FitWidth(Scroller.ViewportWidth));
+        View.Focus();
+    }
+
+    void ToggleNav(bool on)
+    {
+        NavPane.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        NavCol.Width = on ? new GridLength(230) : new GridLength(0);
+        _navVer = -1; RefreshNav();
+    }
+
+    void RefreshNav()
+    {
+        if (NavPane.Visibility != Visibility.Visible || _doc == null || _navVer == _doc.Version) return;
+        _navVer = _doc.Version;
+        NavList.Items.Clear();
+        var hs = _s.Headings();
+        if (hs.Count == 0) { NavList.Items.Add(new ListBoxItem { Content = new TextBlock { Text = "Nessun titolo: applica lo stile Titolo 1-3.", TextWrapping = TextWrapping.Wrap }, IsEnabled = false }); return; }
+        foreach (var (p, lvl, t) in hs)
+            NavList.Items.Add(new ListBoxItem { Content = new TextBlock { Text = t, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(lvl * 14, 0, 0, 0) }, Tag = p, ToolTip = t });
+    }
+
+    void NavList_Selected(object? s, SelectionChangedEventArgs e)
+    {
+        if (NavList.SelectedItem is ListBoxItem { Tag: DocumentFormat.OpenXml.Wordprocessing.Paragraph p }) { NavList.SelectedItem = null; Do(() => _s.SetCaret(p, 0)); }
+    }
 
     void Shape_Click()
     {
@@ -602,8 +646,9 @@ public partial class MainWindow
     // ---------------------------------------------------------------- stato
     void BuildStatusBar()
     {
-        Button V(string icon, bool on, bool enabled) { var b = new Button { Content = Icons.Make(icon, 16), Padding = new Thickness(5, 2, 5, 2), IsEnabled = enabled, ToolTip = enabled ? "Layout di stampa" : Soon }; if (on) { b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); _printViewBtn = b; } ViewBar.Children.Add(b); return b; }
-        V("read", false, false); V("print", true, true);
+        Button V(string icon, string tip, Action act) { var b = new Button { Content = Icons.Make(icon, 16), Padding = new Thickness(5, 2, 5, 2), ToolTip = tip }; System.Windows.Automation.AutomationProperties.SetName(b, tip); b.Click += (_, _) => act(); ViewBar.Children.Add(b); return b; }
+        _readBtn = V("read", "Modalità di lettura", () => SetReadMode(true));
+        _printViewBtn = V("print", "Layout di stampa", () => SetReadMode(false)); Mark(_printViewBtn, true);
         var minus = new Button { Content = Icons.Make("close", 10), Padding = new Thickness(4), ToolTip = "Riduci zoom" };
         minus.Content = new TextBlock { Text = "−" }; minus.Click += (_, _) => View.SetZoom(View.Zoom / 1.1);
         var plus = new Button { Content = new TextBlock { Text = "+" }, Padding = new Thickness(4), ToolTip = "Aumenta zoom" }; plus.Click += (_, _) => View.SetZoom(View.Zoom * 1.1);

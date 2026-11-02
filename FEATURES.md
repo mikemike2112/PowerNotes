@@ -157,7 +157,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Dimensioni — A4, A5, Letter, Legal
 - [x] **P0** Colonne — menu 1/2/3 colonne uguali
 - [x] **P0** Interruzioni — pagina, sezione pagina successiva, sezione continua
-- [ ] **P1** Numeri di riga
+- [x] **P1** Numeri di riga — nessuno / continui / riavvia a ogni pagina / a ogni sezione (lnNumType su tutte le sezioni), disegnati nel margine su schermo, PDF e stampa; esclusi tabelle, note, intestazioni e paragrafi con «sopprimi numeri di riga» — test Core e layout; un numero per pagina anche con più colonne
 
 ### Paragrafo
 - [ ] **P2** Aumenta
@@ -282,7 +282,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ## Scheda Visualizza
 
 ### Visualizzazioni
-- [ ] **P2** Modalità di lettura
+- [x] **P2** Modalità di lettura — solo lettura senza ribbon né righelli, adatta alla larghezza, Esc o Layout di stampa per uscire (anche dalla barra di stato); modifiche da tastiera/ricerca comandi bloccate — verificato nell'interfaccia
 - [x] **P0** Layout di stampa — unica vista
 
 ### Immersiva
@@ -295,14 +295,14 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 
 ### Mostra
 - [ ] **P1** Righello
-- [ ] **P2** Griglia
-- [ ] **P2** Riquadro di spostamento
+- [x] **P2** Griglia — linee ogni 0,5 cm sulla pagina, solo a schermo
+- [x] **P2** Riquadro di spostamento — elenco dei titoli (livello struttura) con rientro per livello, un clic porta il cursore; si aggiorna con le modifiche — test Core (Headings)
 
 ### Zoom
 - [x] **P0** Zoom... — pulsanti −/+/100% e Ctrl+rotella
 - [x] **P0** 100%
 - [ ] **P1** Una pagina
-- [ ] **P2** Più pagine
+- [x] **P2** Più pagine — due pagine affiancate con zoom adattato; Una pagina / 100% / Larghezza pagina tornano a una colonna
 - [ ] **P1** Larghezza pagina
 
 ### Finestra
