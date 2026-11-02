@@ -36,6 +36,7 @@ static class Icons
         ["select"] = "M6,3 V19 L10,15 L13,22 L16,21 L13,14 H19 Z",
         ["table"] = "M3,4 H21 V20 H3 Z M3,10 H21 M3,15 H21 M9,4 V20 M15,4 V20",
         ["image"] = "M3,5 H21 V19 H3 Z M3,16 L9,10 L14,15 L17,12 L21,16 M16,9 A1.5,1.5 0 1 0 16.01,9",
+        ["footnote"] = "M5,3 H15 V13 H5 Z M3,17 H21 M3,21 H12 M17,3 V9",
         ["pagebreak"] = "M7,3 H17 V9 M7,3 V9 M3,12 H6 M9,12 H15 M18,12 H21 M7,15 V21 H17 V15",
         ["blankpage"] = "M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19",
         ["header"] = "M5,3 H19 V21 H5 Z M5,8 H19 M8,5.5 H14",

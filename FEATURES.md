@@ -29,7 +29,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ### Carattere
 - [x] **P0** Ingrandisci carattere — passi 8-72
 - [x] **P0** Riduci carattere — passi 8-72
-- [ ] **P1** Cancella formattazione
+- [x] **P1** Cancella formattazione — toglie la formattazione diretta dei caratteri (selezione), annullabile — test sessione
 - [x] **P0** Grassetto
 - [x] **P0** Corsivo
 - [x] **P0** Sottolineato
@@ -84,7 +84,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 ## Scheda Inserisci
 
 ### Pagine
-- [ ] **P1** Pagina vuota
+- [x] **P1** Pagina vuota — due interruzioni di pagina al cursore, un solo annulla — test sessione
 - [x] **P0** Interruzione di pagina
 
 ### Tabelle
@@ -178,7 +178,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [ ] **P2** Aggiungi testo
 
 ### Note a piè di pagina
-- [ ] **P1** Inserisci nota a piè di pagina
+- [x] **P1** Inserisci nota a piè di pagina — scheda Riferimenti: richiamo al cursore + testo nota (crea la parte note se manca), impaginata a fondo pagina (schermo, PDF, stampa), annullabile, salvataggio valido per il validatore Open XML — test sessione e layout; la nota non è modificabile sul foglio dopo l'inserimento
 - [ ] **P2** Inserisci nota di chiusura
 - [ ] **P2** Nota a piè di pagina successiva
 - [ ] **P2** Mostra note

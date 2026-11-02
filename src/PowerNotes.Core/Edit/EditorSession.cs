@@ -164,6 +164,7 @@ public sealed class EditorSession
     // ---------- digitazione ----------
     public void Type(string text)
     {
+        text = XmlOps.Clean(text);
         if (text.Length == 0) return;
         bool plain = !text.Contains('\n') && !text.Contains('\t') && !text.Contains('\r');
         Begin(plain && !HasSelection ? "type" : null);
@@ -570,8 +571,9 @@ public sealed class EditorSession
 
     public void SetCaps(bool on, bool small) => ApplyRun(r => { r.Caps = small ? null : on ? new Caps() : null; r.SmallCaps = small && on ? new SmallCaps() : null; if (!small && !on) r.Caps = null; });
     public void SetFont(string name) => ApplyRun(r => r.RunFonts = new RunFonts { Ascii = name, HighAnsi = name, EastAsia = name, ComplexScript = name });
-    public void SetSize(double pt) => ApplyRun(r => { var v = ((int)Math.Round(pt * 2)).ToString(); r.FontSize = new FontSize { Val = v }; r.FontSizeComplexScript = new FontSizeComplexScript { Val = v }; });
-    public void SetColor(string? hex) => ApplyRun(r => r.Color = hex == null ? new Color { Val = "auto" } : new Color { Val = hex });
+    public void SetSize(double pt) => ApplyRun(r => { var v = (double.IsNaN(pt) ? 22 : (int)Math.Clamp(Math.Round(pt * 2), 2, 3276)).ToString(); r.FontSize = new FontSize { Val = v }; r.FontSizeComplexScript = new FontSizeComplexScript { Val = v }; });
+    public void SetColor(string? hex) { if (hex != null && !System.Text.RegularExpressions.Regex.IsMatch(hex, "^[0-9A-Fa-f]{6}$")) throw new ArgumentException("Colore non valido.", nameof(hex)); SetColorCore(hex); }
+    void SetColorCore(string? hex) => ApplyRun(r => r.Color = hex == null ? new Color { Val = "auto" } : new Color { Val = hex });
     public void SetHighlight(HighlightColorValues? h) => ApplyRun(r => r.Highlight = h == null ? null : new Highlight { Val = h });
     public void SetVertAlign(int v) => ApplyRun(r => r.VerticalTextAlignment = v == 0 ? null : new VerticalTextAlignment { Val = v > 0 ? VerticalPositionValues.Superscript : VerticalPositionValues.Subscript });
 
@@ -592,24 +594,27 @@ public sealed class EditorSession
         sp.Line = ((int)Math.Round(multiple * 240)).ToString(); sp.LineRule = LineSpacingRuleValues.Auto;
     });
 
+    /// <summary>Punti → twip, limitati ai valori ammessi da Word (NaN = 0).</summary>
+    static int Tw(double pt, int min) => double.IsNaN(pt) ? 0 : (int)Math.Clamp(Math.Round(pt * 20), min, 31680);
+
     public void SetSpacing(double? beforePt, double? afterPt) => ApplyPara(pp =>
     {
         var sp = pp.SpacingBetweenLines ?? (pp.SpacingBetweenLines = new SpacingBetweenLines());
-        if (beforePt != null) sp.Before = ((int)Math.Round(beforePt.Value * 20)).ToString();
-        if (afterPt != null) sp.After = ((int)Math.Round(afterPt.Value * 20)).ToString();
+        if (beforePt != null) sp.Before = Tw(beforePt.Value, 0).ToString();
+        if (afterPt != null) sp.After = Tw(afterPt.Value, 0).ToString();
     });
 
     /// <summary>Rientri in punti. first positivo = prima riga, negativo = sporgente.</summary>
     public void SetIndent(double? left, double? right, double? first) => ApplyPara(pp =>
     {
         var ind = pp.Indentation ?? (pp.Indentation = new Indentation());
-        if (left != null) ind.Left = ((int)Math.Round(left.Value * 20)).ToString();
-        if (right != null) ind.Right = ((int)Math.Round(right.Value * 20)).ToString();
+        if (left != null) ind.Left = Tw(left.Value, -31680).ToString();
+        if (right != null) ind.Right = Tw(right.Value, -31680).ToString();
         if (first != null)
         {
             ind.FirstLine = null; ind.Hanging = null;
-            if (first > 0) ind.FirstLine = ((int)Math.Round(first.Value * 20)).ToString();
-            else if (first < 0) ind.Hanging = ((int)Math.Round(-first.Value * 20)).ToString();
+            if (first > 0) ind.FirstLine = Tw(first.Value, 0).ToString();
+            else if (first < 0) ind.Hanging = Tw(-first.Value, 0).ToString();
         }
     });
 
@@ -669,6 +674,41 @@ public sealed class EditorSession
         var np = XmlOps.Split(Caret.P, Caret.Off + 1);
         Set(new Pos(np, 0)); Changed();
     }
+
+    /// <summary>Inserisce un richiamo di nota a piè di pagina al cursore e crea la nota con il testo dato. Solo nel corpo del documento.</summary>
+    public void InsertFootnote(string text)
+    {
+        if (Caret.P.Ancestors<Body>().Count() == 0 || Caret.P.Ancestors<Footnote>().Any()) throw new InvalidOperationException("Le note si inseriscono solo nel corpo del documento.");
+        Begin();
+        var main = Doc.Pkg.MainDocumentPart!;
+        const string Wns = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"";
+        var fp = main.FootnotesPart ?? main.AddNewPart<FootnotesPart>();
+        fp.Footnotes ??= new Footnotes(
+            new Footnote($"<w:footnote {Wns} w:type=\"separator\" w:id=\"-1\"><w:p><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:r><w:separator/></w:r></w:p></w:footnote>"),
+            new Footnote($"<w:footnote {Wns} w:type=\"continuationSeparator\" w:id=\"0\"><w:p><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>"));
+        // settings: riferimento ai separatori (come fa Word); inserito prima degli elementi che nello schema lo seguono
+        if (main.DocumentSettingsPart?.Settings is { } st && st.GetFirstChild<FootnoteDocumentWideProperties>() == null)
+        {
+            var after = st.ChildElements.FirstOrDefault(e => e.LocalName is "endnotePr" or "compat" or "docVars" or "rsids" or "mathPr" or "attachedSchema" or "themeFontLang" or "clrSchemeMapping" or "doNotIncludeSubdocsInStats" or "doNotAutoCompressPictures" or "forceUpgrade" or "captions" or "readModeInkLockDown" or "smartTagType" or "schemaLibrary" or "shapeDefaults" or "doNotEmbedSmartTags" or "decimalSymbol" or "listSeparator");
+            var fpr = new FootnoteDocumentWideProperties(new FootnoteSpecialReference { Id = -1 }, new FootnoteSpecialReference { Id = 0 });
+            if (after != null) st.InsertBefore(fpr, after); else st.Append(fpr);
+        }
+        var sty = BuiltIns.EnsureStyle(Doc.Pkg, "FootnoteText"); var rsty = BuiltIns.EnsureStyle(Doc.Pkg, "FootnoteReference");
+        long id = fp.Footnotes.Elements<Footnote>().Select(f => f.Id?.Value ?? 0).DefaultIfEmpty(0).Max() + 1;
+        var refRun = new Run(new RunProperties(new RunStyle { Val = rsty }), new FootnoteReference { Id = id });
+        XmlOps.PlaceRun(Caret.P, Caret.Off, refRun);
+        var np = new Paragraph(new ParagraphProperties(new ParagraphStyleId { Val = sty }),
+            new Run(new RunProperties(new RunStyle { Val = rsty }), new FootnoteReferenceMark()),
+            new Run(new Text(" " + text) { Space = SpaceProcessingModeValues.Preserve }));
+        fp.Footnotes.Append(new Footnote(np) { Id = id });
+        Changed();
+    }
+
+    /// <summary>Pagina vuota al cursore: due interruzioni di pagina, un solo annulla.</summary>
+    public void InsertBlankPage() => Batch(() => { InsertPageBreak(); InsertPageBreak(); });
+
+    /// <summary>Toglie la formattazione diretta del carattere (selezione, o testo digitato da qui in poi).</summary>
+    public void ClearFormatting() => ApplyRun(r => r.RemoveAllChildren());
 
     public void InsertTable(int rows, int cols)
     {
@@ -1098,6 +1138,7 @@ public sealed class EditorSession
     public int ReplaceAll(string what, string with, bool matchCase)
     {
         if (what.Length == 0) return 0;
+        with = XmlOps.Clean(with);
         Begin();
         int count = 0;
         var cmp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;

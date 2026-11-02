@@ -103,7 +103,7 @@ static class SelfTest
         var cells = w.Doc.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.TableCell>().ToList();
         v.ClickAt(v.PointFor(cells[0].Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>().First(), 0)!.Value, false);
         v.ClickAt(v.PointFor(cells[1].Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>().First(), 0)!.Value, true); await Idle();
-        w.SelectTab(5); await Idle();
+        w.SelectTab(6); await Idle();
         ClickButton(w, "Unisci celle"); await Idle();
         Check(w.Doc.Body.Descendants<DocumentFormat.OpenXml.Wordprocessing.TableRow>().First().Elements<DocumentFormat.OpenXml.Wordprocessing.TableCell>().Count() == 2, "unione di due celle dalla scheda Tabella");
         KeyDown(v, Key.Tab); TextIn(v, "cella"); await Idle();

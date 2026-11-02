@@ -239,6 +239,7 @@ public partial class MainWindow
         var r1 = Row(FontBox, SizeBox);
         Small(r1, null, "generic", () => Do(() => _s.StepSize(true)), "Ingrandisci carattere (Ctrl+>)").Content = new TextBlock { Text = "A▲", FontSize = 11 };
         Small(r1, null, "generic", () => Do(() => _s.StepSize(false)), "Riduci carattere (Ctrl+<)").Content = new TextBlock { Text = "A▼", FontSize = 11 };
+        Small(r1, null, "generic", () => Do(() => _s.ClearFormatting()), "Cancella formattazione").Content = new TextBlock { Text = "A✕", FontSize = 11 };
         Small(r1, null, "generic", () => { }, null, false).Content = new TextBlock { Text = "Aa", FontSize = 12 };
         var r2 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
         BoldBtn = Toggle(r2, "G", "Grassetto", () => Do(() => _s.ToggleBold()), null, FontWeights.Bold);
@@ -297,7 +298,7 @@ public partial class MainWindow
         // ====== Inserisci
         var ins = NewTab("Inserisci");
         g = Group(ins, "Pagine");
-        var pg = new StackPanel(); Stub(pg, "Pagina vuota", "blankpage"); Small(pg, "Interruzione di pagina", "pagebreak", () => Do(() => _s.InsertPageBreak())); g.Children.Add(pg);
+        var pg = new StackPanel(); Small(pg, "Pagina vuota", "blankpage", () => Do(() => _s.InsertBlankPage())); Small(pg, "Interruzione di pagina", "pagebreak", () => Do(() => _s.InsertPageBreak())); g.Children.Add(pg);
         g = Group(ins, "Tabelle");
         Large(g, "Tabella", "table", () => InsertTable_Click(this, new RoutedEventArgs()));
         g = Group(ins, "Illustrazioni");
@@ -332,6 +333,12 @@ public partial class MainWindow
         TextBlock Lb(string t) => new() { Text = t, Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, Width = 66 };
         g.Children.Add(Col(Row(new TextBlock { Text = "Rientro", FontSize = 12, Foreground = (Brush)FindResource("MutedBrush") }), Row(Lb("A sinistra:"), _indL), Row(Lb("A destra:"), _indR)));
         g.Children.Add(Col(Row(new TextBlock { Text = "Spaziatura", FontSize = 12, Foreground = (Brush)FindResource("MutedBrush") }), Row(Lb("Prima:"), _spB), Row(Lb("Dopo:"), _spA)));
+
+        // ====== Riferimenti
+        var rif = NewTab("Riferimenti");
+        g = Group(rif, "Note a piè di pagina");
+        Large(g, "Inserisci nota a piè di pagina", "footnote", () => InsertFootnote_Click());
+        var nt = new StackPanel(); Stub(nt, "Inserisci nota di chiusura", "generic"); Stub(nt, "Nota successiva", "generic"); g.Children.Add(nt);
 
         // ====== Visualizza
         var vw = NewTab("Visualizza");
