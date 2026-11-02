@@ -10,6 +10,8 @@ public abstract class Prim { }
 public sealed class TextPrim : Prim { public double X, Baseline, Width; public string Text = ""; public RunFmt Fmt = new(); }
 public sealed class RectPrim : Prim { public double X, Y, W, H; public string Fill = "000000"; }
 public sealed class LinePrim : Prim { public double X1, Y1, X2, Y2, Width; public string Color = "000000"; }
+/// <summary>Forma predefinita (prstGeom): riempimento e contorno opzionali.</summary>
+public sealed class ShapePrim : Prim { public double X, Y, W, H, LineW; public string Geom = "rect"; public string? Fill, Line; }
 public sealed class ImagePrim : Prim { public double X, Y, W, H; public ImagePart? Part; }
 
 /// <summary>Frammento di riga (parola, spazio, tab…) con offset nel paragrafo, usato per caret e hit-test.</summary>

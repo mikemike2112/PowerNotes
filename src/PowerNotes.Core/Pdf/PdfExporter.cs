@@ -67,6 +67,21 @@ public static class PdfExporter
                             g.DrawString(t.Text, font, new XSolidBrush(Col(t.Fmt.Color)), new XPoint(t.X, t.Baseline), XStringFormats.BaseLineLeft);
                             break;
                         }
+                    case ShapePrim sh:
+                        {
+                            var brush = sh.Fill != null ? new XSolidBrush(Col(sh.Fill)) : null;
+                            var pen = sh.Line != null ? new XPen(Col(sh.Line), sh.LineW) : null;
+                            var poly = Shapes.Polygon(sh.Geom, sh.W, sh.H);
+                            if (poly != null)
+                            {
+                                var pts = poly.Select(q => new XPoint(sh.X + q.X, sh.Y + q.Y)).ToArray();
+                                if (brush != null && pen != null) g.DrawPolygon(pen, brush, pts, XFillMode.Winding); else if (brush != null) g.DrawPolygon(brush, pts, XFillMode.Winding); else if (pen != null) g.DrawPolygon(pen, pts);
+                            }
+                            else if (sh.Geom == "ellipse") { if (brush != null && pen != null) g.DrawEllipse(pen, brush, sh.X, sh.Y, sh.W, sh.H); else if (brush != null) g.DrawEllipse(brush, sh.X, sh.Y, sh.W, sh.H); else if (pen != null) g.DrawEllipse(pen, sh.X, sh.Y, sh.W, sh.H); }
+                            else if (sh.Geom == "roundRect") { double r = Shapes.Radius(sh.W, sh.H) * 2; if (brush != null && pen != null) g.DrawRoundedRectangle(pen, brush, sh.X, sh.Y, sh.W, sh.H, r, r); else if (brush != null) g.DrawRoundedRectangle(brush, sh.X, sh.Y, sh.W, sh.H, r, r); else if (pen != null) g.DrawRoundedRectangle(pen, sh.X, sh.Y, sh.W, sh.H, r, r); }
+                            else { if (brush != null) g.DrawRectangle(brush, sh.X, sh.Y, sh.W, sh.H); if (pen != null) g.DrawRectangle(pen, sh.X, sh.Y, sh.W, sh.H); }
+                            break;
+                        }
                     case ImagePrim im when im.Part != null:
                         try
                         {

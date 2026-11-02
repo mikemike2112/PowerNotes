@@ -23,7 +23,7 @@ public sealed class LayoutEngine
     sealed class TableL : Block { public double X; public List<RowL> Rows = new(); public double[] Grid = []; }
     record Bdr(double W, string Color);
     /// <summary>Oggetto ancorato (immagine o casella di testo): posizione risolta in fase di emissione.</summary>
-    sealed class FloatL { public double W, H, OffX, OffY, Dist; public string HFrom = "column", VFrom = "paragraph"; public string? HAlign, VAlign, Fill, LineColor; public double LineW; public bool Behind; public string Wrap = "none"; public ImagePart? Img; public List<Paragraph>? BoxParas; }
+    sealed class FloatL { public double W, H, OffX, OffY, Dist; public string HFrom = "column", VFrom = "paragraph"; public string? HAlign, VAlign, Fill, LineColor, Geom; public double LineW; public bool Behind; public string Wrap = "none"; public ImagePart? Img; public List<Paragraph>? BoxParas; }
 
     sealed class Ctx
     {
@@ -740,7 +740,8 @@ public sealed class LayoutEngine
             f.Fill = fillClr == null ? null : Attr(fillClr, "val");
             var ln = anchor.Descendants().FirstOrDefault(e => e.LocalName == "ln" && e.Parent?.LocalName == "spPr");
             if (ln != null) { f.LineW = Emu(Attr(ln, "w")); f.LineColor = ln.Descendants().FirstOrDefault(e => e.LocalName == "srgbClr") is { } lc ? Attr(lc, "val") : null; if (f.LineColor != null && f.LineW <= 0) f.LineW = 0.75; }
-            if (f.Img != null || f.BoxParas != null) res.Add(f);
+            if (anchor.Descendants().FirstOrDefault(e => e.LocalName == "prstGeom" && e.Parent?.LocalName == "spPr") is { } pg && Attr(pg, "prst") is { } prst && Shapes.IsKnown(prst)) f.Geom = prst;
+            if (f.Img != null || f.BoxParas != null || f.Geom != null) res.Add(f);
         }
         return res;
     }
@@ -753,10 +754,12 @@ public sealed class LayoutEngine
             double areaX = f.HFrom is "page" ? 0 : f.HFrom is "margin" or "leftMargin" or "insideMargin" ? pg.MarL : p.X + _colShift;
             double areaW = f.HFrom is "page" ? pg.Width : f.HFrom is "margin" ? pg.Width - pg.MarL - pg.MarR : p.Width;
             double x = f.HAlign switch { "center" => areaX + (areaW - f.W) / 2, "right" => areaX + areaW - f.W, "left" => areaX, _ => areaX + f.OffX };
-            double areaY = f.VFrom is "page" or "topMargin" ? 0 : f.VFrom is "margin" ? pg.MarT : paraTop;
+            // «sopra e sotto» ancorato al paragrafo: lo spazio riservato sta sopra il testo, l'oggetto lo occupa
+            double areaY = f.VFrom is "page" or "topMargin" ? 0 : f.VFrom is "margin" ? pg.MarT : paraTop - (f.Wrap == "topBottom" && f.VFrom == "paragraph" ? p.Floats.Where(q => q.Wrap == "topBottom" && q.VFrom == "paragraph").Sum(q => q.H + 2 * q.Dist) : 0);
             double areaH = f.VFrom is "page" ? pg.Height : f.VFrom is "margin" ? pg.Height - pg.MarT - pg.MarB : f.H;
             double y = f.VAlign switch { "center" => areaY + (areaH - f.H) / 2, "bottom" => areaY + areaH - f.H, "top" => areaY, _ => areaY + f.OffY };
             if (f.Img != null) _pg.Prims.Add(new ImagePrim { X = x, Y = y, W = f.W, H = f.H, Part = f.Img });
+            if (f.Geom != null && f.BoxParas == null && f.Img == null) _pg.Prims.Add(new ShapePrim { X = x, Y = y, W = f.W, H = f.H, Geom = f.Geom, Fill = f.Fill, Line = f.LineColor, LineW = Math.Max(0.5, f.LineW) });
             if (f.BoxParas != null)
             {
                 if (f.Fill != null) _pg.Prims.Add(new RectPrim { X = x, Y = y, W = f.W, H = f.H, Fill = f.Fill });

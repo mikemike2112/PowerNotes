@@ -1,4 +1,6 @@
+using MemoryStream = System.IO.MemoryStream;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.Windows.Controls;
 using System.Windows.Shapes;
@@ -82,6 +84,27 @@ static class Icons
         ["caret"] = "M6,9 L12,15 L18,9",
         ["search"] = "M10,4 A6,6 0 1 0 10.01,4 M14.5,14.5 L21,21",
     };
+
+    /// <summary>Icone proposte da Inserisci > Icone (chiave, nome).</summary>
+    public static readonly (string Key, string Name)[] Gallery =
+    [
+        ("save", "Salva"), ("find", "Lente"), ("image", "Immagine"), ("table", "Tabella"), ("gear", "Ingranaggio"), ("moon", "Luna"), ("shield", "Scudo"),
+        ("print", "Stampante"), ("web", "Globo"), ("columns", "Colonne"), ("footnote", "Nota"), ("bullets", "Elenco puntato"), ("numbers", "Elenco numerato"),
+        ("open", "Cartella"), ("export", "Documento esportato"), ("header", "Pagina con intestazione"), ("zoom", "Zoom"), ("dlg-info", "Informazione"),
+        ("dlg-warn", "Attenzione"), ("dlg-question", "Domanda"), ("select", "Cursore"), ("merge", "Unione"),
+    ];
+
+    /// <summary>Icona disegnata in PNG trasparente (px × px) nel colore dato (RRGGBB).</summary>
+    public static byte[] Png(string key, string colorHex, int px = 256)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#" + colorHex)); brush.Freeze();
+        var pen = new Pen(brush, 1.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round }; pen.Freeze();
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen()) { dc.PushTransform(new ScaleTransform(px / 24.0, px / 24.0)); dc.DrawGeometry(null, pen, Geo(key)); }
+        var rtb = new RenderTargetBitmap(px, px, 96, 96, PixelFormats.Pbgra32); rtb.Render(dv);
+        var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(rtb));
+        using var ms = new MemoryStream(); enc.Save(ms); return ms.ToArray();
+    }
 
     static readonly Dictionary<string, Geometry> Cache = new();
 
