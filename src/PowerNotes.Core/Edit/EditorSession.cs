@@ -1059,13 +1059,8 @@ public sealed partial class EditorSession
     /// <summary>Testo della storia (intestazione/piè) in modifica.</summary>
     public string GetHeaderFooterTextFromStory() => _storyRoot == null ? "" : string.Join(((char)10).ToString(), _storyRoot.Elements<Paragraph>().Select(ParaText.Text));
 
-    public string GetHeaderFooterText(bool header)
-    {
-        var sp = SectionFor(Caret.P);
-        var part = FindHF(sp, header);
-        OpenXmlElement? root = header ? (part as HeaderPart)?.Header : (OpenXmlElement?)(part as FooterPart)?.Footer;
-        return root == null ? "" : string.Join("\n", root.Elements<Paragraph>().Select(ParaText.Text));
-    }
+    /// <summary>Testo fisso di intestazione/piè (i campi numero di pagina non sono testo: vedi <see cref="GetHeaderFooter"/>).</summary>
+    public string GetHeaderFooterText(bool header) => GetHeaderFooter(header).Text;
 
     OpenXmlPart? FindHF(SectionProperties sp, bool header)
     {
