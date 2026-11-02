@@ -124,6 +124,16 @@ public sealed class FindDialog : Window
     }
 }
 
+/// <summary>Stampa solo le pagine di <paramref name="map"/> (indici del layout, anche ripetuti per le copie).</summary>
+public sealed class RangePaginator(DocumentPaginator inner, IReadOnlyList<int> map) : DocumentPaginator
+{
+    public override bool IsPageCountValid => true;
+    public override int PageCount => map.Count;
+    public override Size PageSize { get => inner.PageSize; set { } }
+    public override IDocumentPaginatorSource? Source => null;
+    public override DocumentPage GetPage(int pageNumber) => inner.GetPage(map[pageNumber]);
+}
+
 /// <summary>Stampa: ogni pagina è il disegno del layout, identico a quello a schermo.</summary>
 public sealed class LayoutPaginator(LayoutResult layout) : DocumentPaginator
 {

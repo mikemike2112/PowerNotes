@@ -43,6 +43,9 @@ public partial class MainWindow
         View.Scroller = Scroller;
         View.LinkClicked += OpenLink;
         NavList.SelectionChanged += NavList_Selected;
+        var ctx = new ContextMenu(); View.ContextMenu = ctx;
+        ctx.Opened += (_, _) => BuildContextMenu(ctx);
+        View.PreviewMouseRightButtonDown += (_, e) => { if (!_s.HasSelection) { View.ClickAt(e.GetPosition(View), false); View.Refresh(); } };
         View.PreviewMouseLeftButtonUp += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
         {
             if (_painter == null || !_s.HasSelection) return;
@@ -235,7 +238,7 @@ public partial class MainWindow
 
         // ====== Home
         var home = NewTab("Home");
-        var g = Group(home, "Appunti", () => { });
+        var g = Group(home, "Appunti");
         Large(g, "Incolla", "paste", () => Do(Paste), "Incolla (Ctrl+V)");
         var ap = new StackPanel(); Small(ap, "Taglia", "cut", () => Do(Cut), "Taglia (Ctrl+X)"); Small(ap, "Copia", "copy", () => Do(Copy), "Copia (Ctrl+C)"); Small(ap, "Copia formato", "brush", () => FormatPainter_Click(), "Copia formato: clic qui con il cursore sul testo di origine, poi seleziona il testo di destinazione"); _painterBtn = (Button)ap.Children[^1]; g.Children.Add(ap);
 
@@ -288,7 +291,7 @@ public partial class MainWindow
         bdBtn = Small(p2, null, "borders", () => Menu(bdBtn!, ("Nessun bordo", () => Do(() => _s.SetParaBorders(BorderEdge.None))), ("Contorno", () => Do(() => _s.SetParaBorders(BorderEdge.Box))), ("Bordo superiore", () => Do(() => _s.SetParaBorders(BorderEdge.Top))), ("Bordo inferiore", () => Do(() => _s.SetParaBorders(BorderEdge.Bottom))), ("Bordo sinistro", () => Do(() => _s.SetParaBorders(BorderEdge.Left))), ("Bordo destro", () => Do(() => _s.SetParaBorders(BorderEdge.Right)))), "Bordi del paragrafo");
         g.Children.Add(Col(p1, p2));
 
-        g = Group(home, "Stili", () => { });
+        g = Group(home, "Stili", () => Styles_Click());
         var gal = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 4, 2, 2) };
         void Style(string text, string id, double size, string? color)
         {
@@ -325,7 +328,7 @@ public partial class MainWindow
         g = Group(ins, "Intestazione e piè di pagina");
         var hf = new StackPanel();
         Small(hf, "Intestazione", "header", () => HeaderFooter(true)); Small(hf, "Piè di pagina", "footer", () => HeaderFooter(false));
-        Small(hf, "Numero di pagina", "pagenum", () => { var t = _s.GetHeaderFooterText(false); Do(() => _s.SetHeaderFooter(false, t, Align.Center, PageNumFormat.PageOfTotal)); });
+        Small(hf, "Numero di pagina", "pagenum", () => Do(() => _s.InsertPageNumber()), "Numero di pagina nel piè di pagina (Pagina X di Y)");
         g.Children.Add(hf);
 
         // ====== Layout
@@ -334,11 +337,9 @@ public partial class MainWindow
         Large(g, "Margini", "margins", () => PageSetup_Click(this, new RoutedEventArgs()));
         Large(g, "Orientamento", "orient", () => Orientation_Click(this, new RoutedEventArgs()));
         Large(g, "Dimensioni", "size", () => PageSetup_Click(this, new RoutedEventArgs()));
-        var colBtn = Large(g, "Colonne", "columns", () => { });
-        colBtn.Click += (_, _) => Menu(colBtn, ("Una", () => Do(() => _s.SetColumns(1))), ("Due", () => Do(() => _s.SetColumns(2))), ("Tre", () => Do(() => _s.SetColumns(3))));
+        MenuBtn(g, "Colonne", "columns", true, ("Una", () => Do(() => _s.SetColumns(1))), ("Due", () => Do(() => _s.SetColumns(2))), ("Tre", () => Do(() => _s.SetColumns(3))));
         var ro = new StackPanel();
-        var brk = Small(ro, "Interruzioni", "breaks", () => { });
-        brk.Click += (_, _) => Menu(brk, ("Interruzione di pagina", () => Do(() => _s.InsertPageBreak())), ("Sezione: pagina successiva", () => Do(() => _s.InsertSectionBreak(false))), ("Sezione: continua", () => Do(() => _s.InsertSectionBreak(true))));
+        MenuBtn(ro, "Interruzioni", "breaks", false, ("Interruzione di pagina", () => Do(() => _s.InsertPageBreak())), ("Sezione: pagina successiva", () => Do(() => _s.InsertSectionBreak(false))), ("Sezione: continua", () => Do(() => _s.InsertSectionBreak(true))));
         MenuBtn(ro, "Numeri di riga", "generic", false, ("Nessuno", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.None))), ("Continui", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.Continuous))), ("Riavvia a ogni pagina", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.RestartPage))), ("Riavvia a ogni sezione", () => Do(() => _s.SetLineNumbers(EditorSession.LineNumMode.RestartSection)))); g.Children.Add(ro);
         g = Group(lay, "Paragrafo", () => ParaDialog_Click(this, new RoutedEventArgs()));
         TextBox Num(string tip) { var t = new TextBox { Width = 58, Height = 22, ToolTip = tip, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 1, 2, 1) }; System.Windows.Automation.AutomationProperties.SetName(t, tip); return t; }
@@ -412,8 +413,7 @@ public partial class MainWindow
         Small(t1, "Proprietà", "table", () => TableProps_Click(), "Proprietà tabella: allineamento, larghezza, altezza righe");
         g.Children.Add(t1);
         g = Group(tl, "Righe e colonne");
-        var del = Large(g, "Elimina", "delete", () => { });
-        del.Click += (_, _) => Menu(del, ("Elimina riga", () => Do(() => _s.DeleteRow())), ("Elimina tabella", () => Do(() => _s.DeleteTable())));
+        MenuBtn(g, "Elimina", "delete", true, ("Elimina riga", () => Do(() => _s.DeleteRow())), ("Elimina tabella", () => Do(() => _s.DeleteTable())));
         Large(g, "Inserisci riga sopra", "rowabove", () => Do(() => _s.AddRowAbove()));
         var rc = new StackPanel();
         Small(rc, "Inserisci riga sotto", "rowbelow", () => Do(() => _s.AddRowBelow()));
@@ -513,6 +513,30 @@ public partial class MainWindow
         }
         var none = new MenuItem { Header = "Nessuno sfondo" }; none.Click += (_, _) => Do(() => _s.SetParaShading(null)); m.Items.Add(none);
         m.PlacementTarget = anchor; m.IsOpen = true;
+    }
+
+    /// <summary>Launcher del gruppo Stili: scelta dello stile per il/i paragrafi selezionati.</summary>
+    void Styles_Click()
+    {
+        var names = BuiltIns.Gallery.Select(x => x.Name).ToArray();
+        int cur = Math.Max(0, StyleBox.SelectedIndex);
+        var d = new FormDialog(this, "Stili", new FormField("Stile del paragrafo", names[cur], names));
+        if (d.ShowDialog() != true) return;
+        int i = Array.IndexOf(names, d.Values[0]);
+        if (i >= 0) Do(() => _s.SetStyle(BuiltIns.Gallery[i].Id));
+    }
+
+    /// <summary>Menu del tasto destro sul documento.</summary>
+    void BuildContextMenu(ContextMenu cm)
+    {
+        cm.Items.Clear();
+        MenuItem Item(string t, Action a, bool enabled = true) { var it = new MenuItem { Header = t, IsEnabled = enabled }; it.Click += (_, _) => a(); cm.Items.Add(it); return it; }
+        bool sel = _s.HasSelection, edit = !_read;
+        bool clip; try { clip = Clipboard.ContainsText() || Clipboard.ContainsData(FragFormat); } catch (System.Runtime.InteropServices.ExternalException) { clip = false; }
+        Item("Taglia", () => Do(Cut), sel && edit); Item("Copia", () => Do(Copy), sel); Item("Incolla", () => Do(Paste), clip && edit);
+        cm.Items.Add(new Separator());
+        Item("Collegamento…", Link_Click, edit); Item("Segnalibro…", Bookmark_Click, edit);
+        Item("Carattere…", CharDialog, edit); Item("Paragrafo…", () => ParaDialog_Click(this, new RoutedEventArgs()), edit);
     }
 
     void Shape_Click()

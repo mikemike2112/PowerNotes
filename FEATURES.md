@@ -7,6 +7,11 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Esporta in PDF (stessa pipeline di layout) — test PDF su tutto il corpus + autotest UI
 - [x] **P0** Stampa (paginatore sul layout, finestra di stampa di sistema) — verificato con scrittura XPS dal paginatore nell'autotest UI; la stampa su carta reale non è stata provata
 - [x] **P0** Annulla / Ripeti (istantanee XML, digitazione raggruppata)
+- [x] **P0** Stampa: intervallo di pagine e copie (fascicolate o no) scelti nella finestra di stampa sono applicati alle pagine stampate — test Core (PrintPlan); la stampa su carta reale non è stata provata
+- [x] **P1** Intestazione / piè di pagina: la finestra conserva i campi PAGE/NUMPAGES (testo, allineamento e tipo di numero riletti dal file); contenuti complessi (più righe, tabulazioni, altri campi, testo dopo il numero) si modificano sul foglio invece di essere riscritti; «Numero di pagina» non duplica più «Pagina X di Y» a clic ripetuti — test Core
+- [x] **P1** Imposta pagina: Legal e Letter distinti (si confrontano entrambe le dimensioni) — test Core
+- [x] **P1** Menu contestuale del documento (tasto destro): Taglia, Copia, Incolla, Collegamento, Segnalibro, Carattere, Paragrafo; in sola lettura solo Copia
+- [x] **P1** Scorciatoie Ctrl+> / Ctrl+< (ingrandisci/riduci carattere, anche con tastiera italiana) e launcher del gruppo Stili (scelta dello stile); tolto il launcher vuoto di Appunti; la casella Cerca apre i menu di Colonne, Interruzioni, Elimina
 - [x] **P0** Selezione, caret, frecce, Home/End, PagSu/PagGiù, Ctrl+frecce, doppio/triplo click — test sessione + autotest UI
 - [x] **P0** Scheda Powers: interruttore Modalità scura, impostazioni in %APPDATA%\PowerNotes\settings.json (predefinito scuro, file corrotto gestito) — test con mouse reale, screenshot dei due temi, riavvio, file corrotto
 - [x] **P1** Richiesta di salvataggio moderna (nome, percorso, Sfoglia, conferma sovrascrittura) e finestre tematiche al posto delle finestre di sistema — test sessione; tra documenti le immagini sono omesse

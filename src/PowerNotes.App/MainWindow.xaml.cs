@@ -136,7 +136,14 @@ public partial class MainWindow : Window
     {
         var pd = new PrintDialog { UserPageRangeEnabled = true, MinPage = 1, MaxPage = (uint)Math.Max(1, View.PageCount) };
         if (pd.ShowDialog() != true) return;
-        try { pd.PrintDocument(new LayoutPaginator(_s.Layout), Path.GetFileName(_doc.Path ?? "Documento")); }
+        // intervallo e copie scelti nella finestra: li applichiamo noi alle pagine (e azzeriamo le copie del ticket per non duplicarle)
+        int total = View.PageCount, from = 1, to = total;
+        if (pd.PageRangeSelection == PageRangeSelection.UserPages) { from = pd.PageRange.PageFrom; to = pd.PageRange.PageTo; }
+        int copies = Math.Max(1, (int)(pd.PrintTicket?.CopyCount ?? 1)); bool collated = pd.PrintTicket?.Collation != System.Printing.Collation.Uncollated;
+        var map = PrintPlan.Pages(total, from, to, copies, collated);
+        if (map.Count == 0) { ThemedDialog.Show(this, "Nessuna pagina da stampare nell'intervallo scelto.", "Stampa"); return; }
+        if (pd.PrintTicket != null) pd.PrintTicket.CopyCount = 1;
+        try { pd.PrintDocument(new RangePaginator(new LayoutPaginator(_s.Layout), map), Path.GetFileName(_doc.Path ?? "Documento")); }
         catch (Exception ex) when (ex is InvalidOperationException or System.Printing.PrintQueueException) { ThemedDialog.Show(this, "Stampa non riuscita: " + ex.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
@@ -157,6 +164,7 @@ public partial class MainWindow : Window
             Key.S => () => SaveCore(shift), Key.O => () => Open_Click(this, e), Key.N => () => New_Click(this, e), Key.P => () => Print_Click(this, e),
             Key.F => () => Find_Click(this, e), Key.H => () => Replace_Click(this, e),
             Key.Enter => () => { _s.InsertPageBreak(); },
+            Key.OemPeriod => () => _s.StepSize(true), Key.OemComma => () => _s.StepSize(false), Key.Oem102 => () => _s.StepSize(shift),   // Ctrl+> / Ctrl+< (anche tastiera italiana: <>)
             Key.OemPlus or Key.Add => () => View.SetZoom(View.Zoom * 1.1), Key.OemMinus or Key.Subtract => () => View.SetZoom(View.Zoom / 1.1), Key.D0 or Key.NumPad0 => () => View.SetZoom(1),
             _ => null
         };
@@ -314,16 +322,23 @@ public partial class MainWindow : Window
     void Footer_Click(object s, RoutedEventArgs e) => HeaderFooter(false);
     void PageNumbers_Click(object s, RoutedEventArgs e)
     {
-        var text = _s.GetHeaderFooterText(false);
-        Do(() => _s.SetHeaderFooter(false, text, Align.Center, PageNumFormat.PageOfTotal));
+        Do(() => _s.InsertPageNumber());
     }
 
     void HeaderFooter(bool header)
     {
+        var m = _s.GetHeaderFooter(header);
+        if (m.Complex)
+        {
+            // più paragrafi, tabulazioni, altri campi…: la finestra perderebbe contenuto → si modifica direttamente sul foglio
+            ThemedDialog.Show(this, (header ? "L'intestazione" : "Il piè di pagina") + " ha un contenuto che la finestra non può rappresentare (più righe, tabulazioni, altri campi). Si modifica direttamente sul foglio: Esc per uscire.", header ? "Intestazione" : "Piè di pagina");
+            Do(() => _s.EnterHeaderFooter(header));
+            return;
+        }
         var d = new FormDialog(this, header ? "Intestazione" : "Piè di pagina",
-            new FormField("Testo", _s.GetHeaderFooterText(header)),
-            new FormField("Allineamento", "Centro", "Sinistra", "Centro", "Destra"),
-            new FormField("Numero di pagina", "Nessuno", "Nessuno", "Numero", "Pagina X di Y"));
+            new FormField("Testo", m.Text),
+            new FormField("Allineamento", m.Align == Align.Left ? "Sinistra" : m.Align == Align.Right ? "Destra" : "Centro", "Sinistra", "Centro", "Destra"),
+            new FormField("Numero di pagina", m.Pn == PageNumFormat.Number ? "Numero" : m.Pn == PageNumFormat.PageOfTotal ? "Pagina X di Y" : "Nessuno", "Nessuno", "Numero", "Pagina X di Y"));
         if (d.ShowDialog() != true) return;
         var r = d.Values;
         var al = r[1] == "Sinistra" ? Align.Left : r[1] == "Destra" ? Align.Right : Align.Center;
@@ -336,7 +351,7 @@ public partial class MainWindow : Window
     {
         var p = _s.GetPageSetup();
         const double Cm = 28.3465;
-        string paper = Math.Abs(Math.Min(p.Width, p.Height) - 595.3) < 3 ? "A4" : Math.Abs(Math.Min(p.Width, p.Height) - 612) < 3 ? "Letter" : Math.Abs(Math.Min(p.Width, p.Height) - 419.5) < 3 ? "A5" : Math.Abs(Math.Min(p.Width, p.Height) - 612) < 3 ? "Letter" : "Personalizzato";
+        string paper = EditorSession.PaperName(p.Width, p.Height);
         var d = new FormDialog(this, "Imposta pagina",
             new FormField("Formato", paper == "Personalizzato" ? "A4" : paper, "A4", "A5", "Letter", "Legal"),
             new FormField("Orientamento", p.Landscape ? "Orizzontale" : "Verticale", "Verticale", "Orizzontale"),
