@@ -95,9 +95,9 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P1** Layout di tabella · Seleziona (cella, riga, colonna, tabella), Visualizza griglia (contorni tratteggiati a schermo), Proprietà (allineamento, larghezza %, altezza minima righe; il layout rispetta l'allineamento)
 
 ### Illustrazioni
-- [ ] **P2** Icone
+- [x] **P2** Icone — galleria minima (22 icone del set proprio dell'app) inserita come immagine PNG trasparente, colore e dimensione a scelta, annullabile — test Core (InsertImageData); non sono SVG
 - [x] **P0** Immagini — inline PNG/JPEG/GIF/BMP
-- [ ] **P1** Forme
+- [x] **P1** Forme — versione minima: 9 forme di base (rettangolo, rettangolo arrotondato, ellisse, triangolo, triangolo rettangolo, rombo, esagono, freccia, stella a 5 punte) con riempimento/contorno, ancorate al paragrafo (testo sopra e sotto), disegnate a schermo, in PDF e in stampa, annullabili — test Core + validatore; senza testo interno, rotazione, linee e connettori
 
 ### Elementi multimediali
 - [ ] **P2** Video online...

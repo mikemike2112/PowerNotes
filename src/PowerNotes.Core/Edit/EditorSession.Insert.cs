@@ -245,4 +245,27 @@ public sealed partial class EditorSession
         Set(new Pos(next.p, next.off));
         return true;
     }
+
+    // ---------- forme ----------
+    /// <summary>Inserisce una forma predefinita (una di Shapes.Gallery) ancorata al paragrafo del cursore, con testo sopra e sotto. Dimensioni in punti; fill/line RRGGBB o null.</summary>
+    public void InsertShape(string prst, double widthPt, double heightPt, string? fill, string? line)
+    {
+        if (!PowerNotes.Core.Layout.Shapes.IsKnown(prst)) throw new ArgumentException("Forma non riconosciuta.", nameof(prst));
+        if (double.IsNaN(widthPt) || double.IsNaN(heightPt) || widthPt < 4 || heightPt < 4 || widthPt > 1584 || heightPt > 1584) throw new ArgumentOutOfRangeException(nameof(widthPt), "Dimensioni della forma da 4 a 1584 pt.");
+        foreach (var c in new[] { fill, line }) if (c != null && !Regex.IsMatch(c, "^[0-9A-Fa-f]{6}$")) throw new ArgumentException("Colore non valido: usa 6 cifre esadecimali.");
+        if (Caret.P.Ancestors<Body>().Count() == 0 || Caret.P.Ancestors<Footnote>().Any() || Caret.P.Ancestors<Endnote>().Any()) throw new InvalidOperationException("Le forme si inseriscono solo nel corpo del documento.");
+        Begin();
+        if (HasSelection) DeleteSelectionCore();
+        long cx = (long)(widthPt * 12700), cy = (long)(heightPt * 12700);
+        uint id = (uint)(Doc.Body.Descendants<DocumentFormat.OpenXml.Drawing.Wordprocessing.DocProperties>().Select(d => d.Id?.Value ?? 0).DefaultIfEmpty(0u).Max() + 1);
+        string fillXml = fill == null ? "<a:noFill/>" : $"<a:solidFill><a:srgbClr val=\"{fill.ToUpperInvariant()}\"/></a:solidFill>";
+        string lineXml = line == null ? "<a:ln><a:noFill/></a:ln>" : $"<a:ln w=\"12700\"><a:solidFill><a:srgbClr val=\"{line.ToUpperInvariant()}\"/></a:solidFill></a:ln>";
+        var xml = "<w:drawing xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\">" +
+            "<wp:anchor distT=\"0\" distB=\"0\" distL=\"114300\" distR=\"114300\" simplePos=\"0\" relativeHeight=\"251659264\" behindDoc=\"0\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\">" +
+            "<wp:simplePos x=\"0\" y=\"0\"/><wp:positionH relativeFrom=\"column\"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>0</wp:posOffset></wp:positionV>" +
+            $"<wp:extent cx=\"{cx}\" cy=\"{cy}\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/><wp:wrapTopAndBottom/><wp:docPr id=\"{id}\" name=\"Forma {id}\"/><wp:cNvGraphicFramePr/>" +
+            $"<a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm><a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{fillXml}{lineXml}</wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing>";
+        XmlOps.PlaceRun(Caret.P, Caret.Off, new Run(new Drawing(xml)));
+        Changed();
+    }
 }

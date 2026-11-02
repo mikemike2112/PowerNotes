@@ -48,6 +48,7 @@ public static class PageRenderer
                     dc.DrawLine(pen, new Point(l.X1, l.Y1), new Point(l.X2, l.Y2)); break;
                 case TextPrim t: DrawText(dc, t, pixelsPerDip); break;
                 case ImagePrim im: DrawImage(dc, im); break;
+                case ShapePrim sh: DrawShape(dc, sh); break;
             }
     }
 
@@ -76,6 +77,25 @@ public static class PageRenderer
         var tf = new Typeface(new FontFamily(f.Font), f.Italic ? FontStyles.Italic : FontStyles.Normal, f.Bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
         var ft = new FormattedText(t.Text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, tf, size, brush, ppd);
         dc.DrawText(ft, new Point(t.X, t.Baseline - ft.Baseline));
+    }
+
+    static void DrawShape(DrawingContext dc, ShapePrim sh)
+    {
+        var fill = sh.Fill != null ? Brush(sh.Fill) : null;
+        Pen? pen = null;
+        if (sh.Line != null) { pen = new Pen(Brush(sh.Line), sh.LineW) { LineJoin = PenLineJoin.Miter }; pen.Freeze(); }
+        var r = new Rect(sh.X, sh.Y, sh.W, sh.H);
+        var poly = Shapes.Polygon(sh.Geom, sh.W, sh.H);
+        if (poly != null)
+        {
+            var g = new StreamGeometry();
+            using (var c = g.Open()) { c.BeginFigure(new Point(sh.X + poly[0].X, sh.Y + poly[0].Y), true, true); c.PolyLineTo(poly.Skip(1).Select(q => new Point(sh.X + q.X, sh.Y + q.Y)).ToList(), true, false); }
+            g.Freeze();
+            dc.DrawGeometry(fill, pen, g);
+        }
+        else if (sh.Geom == "ellipse") dc.DrawEllipse(fill, pen, new Point(sh.X + sh.W / 2, sh.Y + sh.H / 2), sh.W / 2, sh.H / 2);
+        else if (sh.Geom == "roundRect") dc.DrawRoundedRectangle(fill, pen, r, Shapes.Radius(sh.W, sh.H), Shapes.Radius(sh.W, sh.H));
+        else dc.DrawRectangle(fill, pen, r);
     }
 
     static void DrawImage(DrawingContext dc, ImagePrim im)

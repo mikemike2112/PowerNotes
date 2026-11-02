@@ -304,7 +304,7 @@ public partial class MainWindow
         Large(g, "Tabella", "table", () => InsertTable_Click(this, new RoutedEventArgs()));
         g = Group(ins, "Illustrazioni");
         Large(g, "Immagini", "image", () => InsertImage_Click(this, new RoutedEventArgs()));
-        var il = new StackPanel(); Stub(il, "Forme", "generic"); Stub(il, "Icone", "generic"); g.Children.Add(il);
+        var il = new StackPanel(); Small(il, "Forme", "generic", () => Shape_Click(), "Forme: rettangolo, ellisse, triangolo, freccia, stella…"); Small(il, "Icone", "generic", () => Icon_Click(), "Icone: inserisce un'icona come immagine"); g.Children.Add(il);
         g = Group(ins, "Collegamenti");
         var lk = new StackPanel(); Small(lk, "Collegamento", "generic", () => Link_Click(), "Collegamento: indirizzo web, e-mail o segnalibro (Ctrl+clic per aprirlo)"); Small(lk, "Segnalibro", "generic", () => Bookmark_Click(), "Segnalibro: aggiungi, vai a, elimina"); g.Children.Add(lk);
         g = Group(ins, "Intestazione e piè di pagina");
@@ -434,6 +434,31 @@ public partial class MainWindow
 
     /// <summary>Evidenzia un pulsante a interruttore.</summary>
     static void Mark(Control b, bool on) { if (on) b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); else b.ClearValue(Control.BackgroundProperty); }
+
+    void Shape_Click()
+    {
+        var names = PowerNotes.Core.Layout.Shapes.Gallery.Select(g => g.Name).ToArray();
+        var d = new FormDialog(this, "Forme", new FormField("Forma", names[0], names), new FormField("Larghezza (pt)", "100"), new FormField("Altezza (pt)", "70"),
+            new FormField("Riempimento (RRGGBB o vuoto)", "4472C4"), new FormField("Contorno (RRGGBB o vuoto)", "2F528F"));
+        if (d.ShowDialog() != true) return;
+        var v = d.Values;
+        if (!double.TryParse(v[1].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var w) || !double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var h))
+        { ThemedDialog.Show(this, "Dimensioni non valide.", "Forme"); return; }
+        string? fill = v[3].Trim().TrimStart('#') is { Length: > 0 } f ? f : null, line = v[4].Trim().TrimStart('#') is { Length: > 0 } l ? l : null;
+        Do(() => _s.InsertShape(PowerNotes.Core.Layout.Shapes.Gallery[Array.IndexOf(names, v[0])].Prst, w, h, fill, line));
+    }
+
+    void Icon_Click()
+    {
+        var names = Icons.Gallery.Select(g => g.Name).ToArray();
+        var d = new FormDialog(this, "Icone", new FormField("Icona", names[0], names), new FormField("Colore (RRGGBB)", "000000"), new FormField("Dimensione (pt)", "36"));
+        if (d.ShowDialog() != true) return;
+        var v = d.Values; var col = v[1].Trim().TrimStart('#');
+        if (col.Length != 6 || !col.All(Uri.IsHexDigit) || !double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var size) || size < 8 || size > 400)
+        { ThemedDialog.Show(this, "Colore a 6 cifre esadecimali, dimensione da 8 a 400.", "Icone"); return; }
+        int i = Array.IndexOf(names, v[0]);
+        Do(() => _s.InsertImageData(Icons.Png(Icons.Gallery[i].Key, col), "Icona: " + names[i], size));
+    }
 
     void Link_Click()
     {

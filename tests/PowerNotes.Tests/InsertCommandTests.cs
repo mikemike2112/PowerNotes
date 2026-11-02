@@ -172,4 +172,59 @@ public class InsertCommandTests
         Assert.True(s.NextNote()); Assert.Equal(7, s.Caret.Off);
         Assert.True(s.NextNote()); Assert.Equal(3, s.Caret.Off);   // ricomincia dall'inizio
     }
+
+    [Fact]
+    public void Shape_InsertedAnchored_DrawnOnPageAndInPdf_OneUndo_Valid()
+    {
+        var (d, s) = NewDoc();
+        s.Type("Testo sotto la forma");
+        int before = Snap(d);
+        s.InsertShape("ellipse", 100, 60, "4472C4", "2F528F");
+        var shapes = d.Layout().Pages[0].Prims.OfType<ShapePrim>().ToList();
+        Assert.Single(shapes);
+        Assert.Equal("ellipse", shapes[0].Geom); Assert.Equal(100, shapes[0].W, 1); Assert.Equal(60, shapes[0].H, 1); Assert.Equal("4472C4", shapes[0].Fill);
+        double textY = d.Layout().Pages[0].Prims.OfType<TextPrim>().First().Baseline;
+        Assert.True(textY > shapes[0].Y + 60, "il testo sta sotto la forma");
+        Assert.Equal("Testo sotto la forma", AllText(d));
+        TableCommandTests.AssertValid(d);
+        using (var d2 = Reopen(d)) Assert.Single(d2.Layout().Pages[0].Prims.OfType<ShapePrim>());
+        Assert.True(PowerNotes.Core.Pdf.PdfExporter.Export(d.Layout()).Length > 500);
+        Assert.True(s.Undo());
+        Assert.Equal(before, Snap(d));
+        Assert.Empty(d.Layout().Pages[0].Prims.OfType<ShapePrim>());
+    }
+
+    [Fact]
+    public void Shape_AllGalleryKindsValidAndPolygonsClosed()
+    {
+        var (d, s) = NewDoc();
+        foreach (var (prst, _) in Shapes.Gallery) { s.InsertShape(prst, 50, 50, "FF0000", null); s.Enter(); }
+        Assert.Equal(Shapes.Gallery.Length, d.Layout().Pages.SelectMany(p => p.Prims.OfType<ShapePrim>()).Count());
+        TableCommandTests.AssertValid(d);
+        Assert.Equal(10, Shapes.Polygon("star5", 50, 50)!.Length);
+    }
+
+    [Theory]
+    [InlineData("nonesiste", 10, 10, "FF0000")]
+    [InlineData("rect", 0, 10, "FF0000")]
+    [InlineData("rect", 10, 5000, "FF0000")]
+    [InlineData("rect", double.NaN, 10, "FF0000")]
+    [InlineData("rect", 10, 10, "ZZZZZZ")]
+    public void Shape_InvalidInput_Refused(string prst, double w, double h, string fill)
+    {
+        var (d, s) = NewDoc();
+        Assert.ThrowsAny<ArgumentException>(() => s.InsertShape(prst, w, h, fill, null));
+        Assert.Empty(d.Body.Descendants<Drawing>());
+    }
+
+    [Fact]
+    public void ImageData_InsertsWithRequestedWidth()
+    {
+        var (d, s) = NewDoc();
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYEJRABCAAUEAQHBXQbyAAAAAElFTkSuQmCC");
+        s.InsertImageData(png, "Icona: prova", 40);
+        var ext = d.Body.Descendants<DocumentFormat.OpenXml.Drawing.Wordprocessing.Extent>().Single();
+        Assert.Equal(40 * 12700, ext.Cx!.Value);
+        TableCommandTests.AssertValid(d);
+    }
 }

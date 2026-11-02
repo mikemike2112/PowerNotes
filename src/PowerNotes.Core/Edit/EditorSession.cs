@@ -936,6 +936,12 @@ public sealed partial class EditorSession
     {
         byte[] bytes;
         try { bytes = File.ReadAllBytes(path); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new InvalidOperationException("Impossibile leggere l'immagine: " + e.Message, e); }
+        InsertImageData(bytes, System.IO.Path.GetFileName(path));
+    }
+
+    /// <summary>Inserisce un'immagine già in memoria. widthPt: larghezza voluta (altrimenti 96 dpi, ridotta al testo).</summary>
+    public void InsertImageData(byte[] bytes, string displayName, double? widthPt = null)
+    {
         var info = ImageInfo(bytes) ?? throw new InvalidOperationException("Formato immagine non supportato (PNG, JPEG, GIF, BMP).");
         if (info.w <= 0 || info.h <= 0 || info.w > 100000 || info.h > 100000) throw new InvalidOperationException("Dimensioni immagine non valide.");
         Begin();
@@ -947,10 +953,11 @@ public sealed partial class EditorSession
         var sec = SectionFor(Caret.P);
         double maxW = ((sec.GetFirstChild<PageSize>()?.Width?.Value ?? 11906) - (sec.GetFirstChild<PageMargin>()?.Left?.Value ?? 1440) - (sec.GetFirstChild<PageMargin>()?.Right?.Value ?? 1440)) / 20.0;
         double wpt = info.w * 0.75, hpt = info.h * 0.75;   // 96 dpi
+        if (widthPt is { } wp && wp >= 1 && wp <= 1584) { hpt = wp * info.h / info.w; wpt = wp; }
         if (wpt > maxW) { hpt *= maxW / wpt; wpt = maxW; }
         long cx = (long)(wpt * 12700), cy = (long)(hpt * 12700);
         uint id = (uint)(Doc.Body.Descendants<DocumentFormat.OpenXml.Drawing.Wordprocessing.DocProperties>().Select(d => d.Id?.Value ?? 0).DefaultIfEmpty(0u).Max() + 1);
-        string name = System.Security.SecurityElement.Escape(System.IO.Path.GetFileName(path));
+        string name = System.Security.SecurityElement.Escape(XmlOps.Clean(displayName));
         var xml = $"<w:drawing xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
             $"<wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\"><wp:extent cx=\"{cx}\" cy=\"{cy}\"/><wp:docPr id=\"{id}\" name=\"Immagine {id}\" descr=\"{name}\"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect=\"1\"/></wp:cNvGraphicFramePr>" +
             $"<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\"><pic:pic><pic:nvPicPr><pic:cNvPr id=\"{id}\" name=\"{name}\"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed=\"{rid}\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
