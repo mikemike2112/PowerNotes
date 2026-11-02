@@ -42,6 +42,10 @@ public partial class MainWindow : Window
     }
 
     public EditorSession Session => _s;
+    /// <summary>Per l'autotest.</summary>
+    public bool ReadMode => _read;
+    public int NavItems => NavList.Items.Count;
+    public int ContextMenuItemCount() { var cm = new ContextMenu(); BuildContextMenu(cm); return cm.Items.Count; }
     public WordDoc Doc => _doc;
 
     // ---------- documento ----------

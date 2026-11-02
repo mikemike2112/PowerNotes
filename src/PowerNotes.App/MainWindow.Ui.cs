@@ -86,7 +86,6 @@ public partial class MainWindow
 
     Button Large(Panel host, string label, string icon, Action act, string? tip = null, bool enabled = true) { var b = Make(label, icon, 30, true, act, tip, enabled); host.Children.Add(b); return b; }
     Button Small(Panel host, string? label, string icon, Action act, string? tip = null, bool enabled = true) { var b = Make(label, icon, 16, false, act, tip ?? label, enabled); host.Children.Add(b); return b; }
-    Button Stub(Panel host, string label, string icon, bool large = false) => large ? Large(host, label, icon, () => { }, null, false) : Small(host, label, icon, () => { }, null, false);
 
     ToggleButton Toggle(Panel host, string text, string tip, Action act, string? icon = null, FontWeight? w = null, FontStyle? st = null, TextDecorationCollection? deco = null)
     {

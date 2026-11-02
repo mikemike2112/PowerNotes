@@ -155,6 +155,27 @@ static class SelfTest
         Check(bar.CompactCount > 0 || bar.OverflowCount > 0, $"larghezza 760: ribbon adattato (compatti {bar.CompactCount}, nel menu {bar.OverflowCount})");
         w.Width = 1500; await Idle(); await Idle();
         Check(bar.CompactCount == 0 && bar.OverflowCount == 0, "larghezza 1500: ribbon completo");
+        // comandi ex inerti: lettura, riquadro di spostamento, più pagine, menu contestuale, viste a schermo
+        int nParas = w.Session.Paragraphs().Count;
+        ClickButton(w, "Modalità di lettura"); await Idle();
+        Check(w.ReadMode && ((FrameworkElement)w.Content).Visibility == Visibility.Visible, "modalità di lettura attiva");
+        TextIn(v, "NON DEVE ENTRARE"); KeyDown(v, Key.Enter); await Idle();
+        Check(w.Session.Paragraphs().Count == nParas && !string.Join("|", w.Session.Paragraphs().Select(ParaText.Text)).Contains("NON DEVE"), "in lettura non si modifica");
+        ClickButton(w, "Layout di stampa"); await Idle();
+        Check(!w.ReadMode, "Layout di stampa esce dalla lettura");
+        w.SelectTab(4); await Idle();
+        var nav = Find<CheckBox>(w, c => c.Content is string t && t == "Riquadro di spostamento")!;
+        nav.IsChecked = true; nav.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle();
+        Check(w.NavItems >= 1, $"riquadro di spostamento elenca i titoli ({w.NavItems})");
+        nav.IsChecked = false; nav.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle();
+        ClickButton(w, "Più pagine"); await Idle();
+        Check(v.PagesPerRow == 2, "Più pagine affianca due pagine");
+        ClickButton(w, "Una pagina"); await Idle();
+        Check(v.PagesPerRow == 1, "Una pagina torna a una colonna");
+        w.SelectTab(0);
+        Check(w.ContextMenuItemCount() >= 6, "menu contestuale del documento");
+        v.ShowMarks = true; v.ShowGrid = true; v.ShowTableGrid = true; v.SetPagesPerRow(2); v.Refresh(); await Idle();
+        v.SetPagesPerRow(1); v.ShowMarks = false; v.ShowGrid = false; v.ShowTableGrid = false; v.Refresh(); await Idle();
         // salvataggio, riapertura, PDF
         var docx = Path.Combine(dir, "selftest.docx"); w.Doc.Save(docx);
         using (var re = WordDoc.Open(docx)) Check(re.Layout().Pages.Count >= 1 && string.Join("|", re.Paragraphs().Select(ParaText.Text)).Contains("Primo capitolo"), "salvataggio e riapertura");
