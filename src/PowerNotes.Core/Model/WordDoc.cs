@@ -103,6 +103,7 @@ public sealed class WordDoc : IDisposable
         if (m.StyleDefinitionsPart is { } sp) yield return ("styles", sp, () => sp.Styles, x => sp.Styles = new Styles(x));
         if (m.NumberingDefinitionsPart is { } np) yield return ("num", np, () => np.Numbering, x => np.Numbering = new Numbering(x));
         if (m.FootnotesPart is { } fnp) yield return ("fn", fnp, () => fnp.Footnotes, x => fnp.Footnotes = new Footnotes(x));
+        if (m.EndnotesPart is { } enp) yield return ("en", enp, () => enp.Endnotes, x => enp.Endnotes = new Endnotes(x));
         foreach (var h in m.HeaderParts) { var hp = h; yield return ("h:" + m.GetIdOfPart(hp), hp, () => hp.Header, x => hp.Header = new Header(x)); }
         foreach (var f in m.FooterParts) { var fp = f; yield return ("f:" + m.GetIdOfPart(fp), fp, () => fp.Footer, x => fp.Footer = new Footer(x)); }
     }

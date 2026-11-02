@@ -37,6 +37,7 @@ public partial class MainWindow
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 40, ResizeBorderThickness = new Thickness(6), GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false, CornerRadius = new CornerRadius(0) });
         StateChanged += (_, _) => ((FrameworkElement)Content).Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
         View.Scroller = Scroller;
+        View.LinkClicked += OpenLink;
 
         BuildTitleBar();
         BuildRibbon();
@@ -305,7 +306,7 @@ public partial class MainWindow
         Large(g, "Immagini", "image", () => InsertImage_Click(this, new RoutedEventArgs()));
         var il = new StackPanel(); Stub(il, "Forme", "generic"); Stub(il, "Icone", "generic"); g.Children.Add(il);
         g = Group(ins, "Collegamenti");
-        var lk = new StackPanel(); Stub(lk, "Collegamento", "generic"); Stub(lk, "Segnalibro", "generic"); g.Children.Add(lk);
+        var lk = new StackPanel(); Small(lk, "Collegamento", "generic", () => Link_Click(), "Collegamento: indirizzo web, e-mail o segnalibro (Ctrl+clic per aprirlo)"); Small(lk, "Segnalibro", "generic", () => Bookmark_Click(), "Segnalibro: aggiungi, vai a, elimina"); g.Children.Add(lk);
         g = Group(ins, "Intestazione e piè di pagina");
         var hf = new StackPanel();
         Small(hf, "Intestazione", "header", () => HeaderFooter(true)); Small(hf, "Piè di pagina", "footer", () => HeaderFooter(false));
@@ -338,7 +339,7 @@ public partial class MainWindow
         var rif = NewTab("Riferimenti");
         g = Group(rif, "Note a piè di pagina");
         Large(g, "Inserisci nota a piè di pagina", "footnote", () => InsertFootnote_Click());
-        var nt = new StackPanel(); Stub(nt, "Inserisci nota di chiusura", "generic"); Stub(nt, "Nota successiva", "generic"); g.Children.Add(nt);
+        var nt = new StackPanel(); Small(nt, "Inserisci nota di chiusura", "generic", () => InsertEndnote_Click()); Small(nt, "Nota successiva", "generic", () => Do(() => { if (!_s.NextNote()) ThemedDialog.Show(this, "Il documento non contiene note.", "Nota successiva"); }), "Va al richiamo di nota successivo"); g.Children.Add(nt);
 
         // ====== Visualizza
         var vw = NewTab("Visualizza");
@@ -433,6 +434,50 @@ public partial class MainWindow
 
     /// <summary>Evidenzia un pulsante a interruttore.</summary>
     static void Mark(Control b, bool on) { if (on) b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); else b.ClearValue(Control.BackgroundProperty); }
+
+    void Link_Click()
+    {
+        string cur = _s.HyperlinkAt() ?? "";
+        bool sel = _s.HasSelection, fresh = !sel && cur.Length == 0;
+        var fields = new List<FormField> { new("Indirizzo (https://… oppure #segnalibro)", cur) };
+        if (fresh) fields.Add(new("Testo da visualizzare", ""));
+        if (cur.Length > 0) fields.Add(new("Azione", "Modifica", "Modifica", "Rimuovi collegamento"));
+        var d = new FormDialog(this, "Collegamento", fields.ToArray());
+        if (d.ShowDialog() != true) return;
+        var v = d.Values;
+        if (cur.Length > 0 && v[^1] == "Rimuovi collegamento") { Do(() => _s.RemoveHyperlink()); return; }
+        Do(() => _s.SetHyperlink(v[0], fresh ? v[1] : null));
+    }
+
+    void Bookmark_Click()
+    {
+        var names = _s.Bookmarks();
+        string hint = names.Count == 0 ? "" : " (esistenti: " + string.Join(", ", names.Take(6)) + (names.Count > 6 ? "…" : "") + ")";
+        var d = new FormDialog(this, "Segnalibro", new FormField("Nome" + hint, names.FirstOrDefault() ?? ""), new FormField("Azione", "Aggiungi", "Aggiungi", "Vai a", "Elimina"));
+        if (d.ShowDialog() != true) return;
+        var v = d.Values; string name = v[0].Trim();
+        switch (v[1])
+        {
+            case "Vai a": Do(() => { if (!_s.GoToBookmark(name)) throw new InvalidOperationException("Segnalibro non trovato."); }); break;
+            case "Elimina": Do(() => { if (!_s.DeleteBookmark(name)) throw new InvalidOperationException("Segnalibro non trovato."); }); break;
+            default: Do(() => _s.AddBookmark(name)); break;
+        }
+    }
+
+    void InsertEndnote_Click()
+    {
+        var d = new FormDialog(this, "Nota di chiusura", new FormField("Testo della nota", ""));
+        if (d.ShowDialog() != true) return;
+        Do(() => _s.InsertEndnote(d.Values[0].Trim()));
+    }
+
+    /// <summary>Ctrl+clic su un collegamento: segnalibro interno o indirizzo esterno (solo http/https/mailto/ftp, riconvalidato).</summary>
+    void OpenLink(string target)
+    {
+        if (target.Length > 1 && target[0] == '#') { Do(() => _s.GoToBookmark(target[1..])); return; }
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(EditorSession.NormalizeLink(target)) { UseShellExecute = true }); }
+        catch (Exception ex) when (ex is ArgumentException or System.ComponentModel.Win32Exception or InvalidOperationException) { ThemedDialog.Show(this, "Impossibile aprire il collegamento: " + ex.Message, "Collegamento", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
 
     void SplitCells_Click()
     {

@@ -33,6 +33,8 @@ public sealed class LayoutEngine
         public Dictionary<int, int[]> Counters = new();
         public Dictionary<Run, RunFmt> RunCache = new();
         public Dictionary<long, int>? Notes;   // solo corpo: id nota → numero progressivo
+        public Dictionary<long, int>? ENotes;   // solo corpo: id nota di chiusura → numero
+        public bool EndMark;                    // dentro una nota di chiusura: il segno si scrive in numeri romani minuscoli
         public int MarkNo;                      // dentro una nota: numero del suo richiamo
         public Action<RunFmt>? CondRun;   // formattazione condizionale dello stile tabella (prima riga in grassetto, ecc.)
     }
@@ -89,7 +91,7 @@ public sealed class LayoutEngine
     {
         var main = _doc.MainDocumentPart ?? throw new InvalidDataException("Documento senza parte principale.");
         var body = main.Document?.Body;
-        _body = new Ctx { St = _st, Part = main, Notes = new() };
+        _body = new Ctx { St = _st, Part = main, Notes = new(), ENotes = new() };
         var sections = new List<(SectInfo sec, List<OpenXmlElement> blocks)>();
         var cur = new List<OpenXmlElement>();
         SectInfo? prev = null;
@@ -119,6 +121,7 @@ public sealed class LayoutEngine
                 built.Add(b is Paragraph p ? BuildPara(p, _left, _width, null, _body) : BuildTable((Table)b, _left, _width, _body));
             PlaceBlocks(built);
         }
+        PlaceEndnotes();
         FlushNotes();
         if (_res.Pages.Count == 0) { _sec = ReadSect(null, null); NewPage(false, true, true); }
         // intestazioni e piè di pagina: ora si conosce il totale
@@ -361,6 +364,47 @@ public sealed class LayoutEngine
         _noteSrc ??= (_doc.MainDocumentPart?.FootnotesPart?.Footnotes?.Elements<Footnote>() ?? Enumerable.Empty<Footnote>())
             .Where(f => f.Id?.Value != null && (f.Type?.Value is null || f.Type.Value == FootnoteEndnoteValues.Normal)).GroupBy(f => f.Id!.Value).ToDictionary(g => g.Key, g => g.First());
         return _noteSrc.GetValueOrDefault(id);
+    }
+
+    Dictionary<long, Endnote>? _endSrc;
+    Endnote? FindEnd(long id)
+    {
+        _endSrc ??= (_doc.MainDocumentPart?.EndnotesPart?.Endnotes?.Elements<Endnote>() ?? Enumerable.Empty<Endnote>())
+            .Where(f => f.Id?.Value != null && (f.Type?.Value is null || f.Type.Value == FootnoteEndnoteValues.Normal)).GroupBy(f => f.Id!.Value).ToDictionary(g => g.Key, g => g.First());
+        return _endSrc.GetValueOrDefault(id);
+    }
+
+    /// <summary>Note di chiusura: elencate dopo l'ultimo blocco del corpo, con un breve filetto sopra.</summary>
+    void PlaceEndnotes()
+    {
+        var en = _body.ENotes;
+        if (en == null || en.Count == 0) return;
+        var blocks = new List<Block>();
+        foreach (var (id, no) in en.OrderBy(k => k.Value))
+        {
+            var note = FindEnd(id); if (note == null) continue;
+            var c = new Ctx { St = _st, Part = _doc.MainDocumentPart!.EndnotesPart!, MarkNo = no, EndMark = true };
+            foreach (var p in note.Elements<Paragraph>()) { var pl = BuildPara(p, _sec.Left + _sec.Gutter, _sec.ContentW, null, c); pl.Story = Story.Footer; blocks.Add(pl); }
+        }
+        if (blocks.Count == 0) return;
+        double need = 14 + (blocks[0] is ParaL f0 && f0.Lines.Count > 0 ? f0.Lines[0].H : 12);
+        if (_y + need > _bottom && _pageHasBody) NewPage(true, false, false);
+        _y += 6;
+        _pg.Prims.Add(new LinePrim { X1 = _sec.Left + _sec.Gutter, X2 = _sec.Left + _sec.Gutter + 144, Y1 = _y, Y2 = _y, Width = 0.5 });
+        _y += 6;
+        PlaceBlocks(blocks);
+    }
+
+    void AddEndMark(List<Atom> atoms, Run r, long id, RunFmt baseRun, Ctx c)
+    {
+        int no;
+        if (id == -1) no = c.MarkNo;
+        else if (c.ENotes == null || FindEnd(id) == null) return;
+        else if (!c.ENotes.TryGetValue(id, out no)) c.ENotes[id] = no = c.ENotes.Count + 1;
+        if (no == 0) return;
+        var f = c.St.ResolveRun(baseRun, r).Clone(); if (f.VertAlign == 0) f.VertAlign = 1;
+        var txt = Roman(no).ToLowerInvariant();
+        atoms.Add(new Atom { K = 'w', Text = txt, Fmt = f, W = Metrics.Width(txt, f), Synth = true });
     }
 
     List<Block> NoteBlocks(long id)
@@ -611,16 +655,18 @@ public sealed class LayoutEngine
             else if (lvl.Suff == "space") atoms.Add(new Atom { K = 's', Text = " ", Fmt = lf, W = Metrics.Width(" ", lf), Synth = true, Spaces = 1 });
         }
         // richiami di nota: non sono foglie (niente offset), si inseriscono come atomi sintetici nell'ordine del documento
-        var nrefs = new Queue<(Run Run, long Id)>(); Dictionary<Run, int>? ord = null;
+        var nrefs = new Queue<(Run Run, long Id, bool End)>(); Dictionary<Run, int>? ord = null;
         foreach (var r in p.Descendants<Run>())
         {
             long? nid = r.GetFirstChild<FootnoteReference>()?.Id?.Value ?? (r.GetFirstChild<FootnoteReferenceMark>() != null ? -1 : null);
-            if (nid != null && r.Ancestors<Paragraph>().First() == p && !r.Ancestors<DeletedRun>().Any() && !r.Ancestors<AlternateContentFallback>().Any()) nrefs.Enqueue((r, nid.Value));
+            bool isEnd = false;
+            if (nid == null) { nid = r.GetFirstChild<EndnoteReference>()?.Id?.Value ?? (r.GetFirstChild<EndnoteReferenceMark>() != null ? -1 : null); isEnd = nid != null; }
+            if (nid != null && r.Ancestors<Paragraph>().First() == p && !r.Ancestors<DeletedRun>().Any() && !r.Ancestors<AlternateContentFallback>().Any()) nrefs.Enqueue((r, nid.Value, isEnd));
         }
         if (nrefs.Count > 0) ord = p.Descendants<Run>().Select((r, i) => (r, i)).ToDictionary(x => x.r, x => x.i);
         void NotesBefore(Run? run)
         {
-            while (nrefs.Count > 0 && (run == null || ord![nrefs.Peek().Run] < ord[run])) { var (nr, id) = nrefs.Dequeue(); AddNoteMark(atoms, nr, id, baseRun, c); }
+            while (nrefs.Count > 0 && (run == null || ord![nrefs.Peek().Run] < ord[run])) { var (nr, id, isEnd) = nrefs.Dequeue(); if (isEnd) AddEndMark(atoms, nr, id, baseRun, c); else AddNoteMark(atoms, nr, id, baseRun, c); }
         }
         foreach (var leaf in ParaText.Leaves(p))
         {

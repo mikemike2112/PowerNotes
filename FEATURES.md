@@ -103,8 +103,8 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [ ] **P2** Video online...
 
 ### Collegamenti
-- [ ] **P1** Collegamento
-- [ ] **P1** Segnalibro...
+- [x] **P1** Collegamento — su selezione (o testo nuovo) a indirizzo http/https/mailto/ftp o a un segnalibro («#nome»); cambio e rimozione; Ctrl+clic apre. Indirizzi con altri schemi (javascript:, file:, data:) rifiutati — test Core + riapertura + validatore
+- [x] **P1** Segnalibro... — aggiungi (nome valido, stesso nome = sposta), vai a, elimina; sopravvive al salvataggio — test Core
 
 ### Commenti
 - [ ] **P1** Commento
@@ -183,8 +183,8 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 
 ### Note a piè di pagina
 - [x] **P1** Inserisci nota a piè di pagina — scheda Riferimenti: richiamo al cursore + testo nota (crea la parte note se manca), impaginata a fondo pagina (schermo, PDF, stampa), annullabile, salvataggio valido per il validatore Open XML — test sessione e layout; la nota non è modificabile sul foglio dopo l'inserimento
-- [ ] **P2** Inserisci nota di chiusura
-- [ ] **P2** Nota a piè di pagina successiva
+- [x] **P2** Inserisci nota di chiusura — richiamo + testo, elencate in fondo al documento con numeri romani minuscoli (schermo, PDF, stampa), annullabile — test Core e layout; non modificabile sul foglio dopo l'inserimento
+- [x] **P2** Nota successiva — porta il cursore sul richiamo di nota (a piè di pagina o di chiusura) seguente, poi ricomincia — test Core
 - [ ] **P2** Mostra note
 - [ ] **P2** Finestra di dialogo Note a piè di pagina e di chiusura...
 
