@@ -84,6 +84,8 @@ public sealed class Page
     public double Width, Height, MarL, MarR, MarT, MarB;
     public List<Prim> Prims = new();
     public List<LineBox> Lines = new();
+    /// <summary>Rettangoli delle celle di tabella (per la griglia di visualizzazione).</summary>
+    public List<(double X, double Y, double W, double H)> Cells = new();
 }
 
 public sealed class LayoutResult

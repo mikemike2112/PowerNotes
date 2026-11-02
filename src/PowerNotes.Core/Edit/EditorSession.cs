@@ -11,7 +11,7 @@ public readonly record struct Pos(Paragraph P, int Off);
 public enum PageNumFormat { None, Number, PageOfTotal }
 
 /// <summary>Controller dell'editor: caret, selezione, comandi di modifica. Indipendente da WPF, quindi testabile.</summary>
-public sealed class EditorSession
+public sealed partial class EditorSession
 {
     public WordDoc Doc { get; }
     public Pos Caret { get; private set; }

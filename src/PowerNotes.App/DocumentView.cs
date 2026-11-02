@@ -22,6 +22,8 @@ public sealed class DocumentView : FrameworkElement
     bool _dragging;
 
     public ScrollViewer? Scroller { get; set; }
+    /// <summary>Visualizza griglia: contorni tratteggiati delle celle di tabella (solo a schermo).</summary>
+    public bool ShowTableGrid { get; set; }
     public double Zoom { get; private set; } = 1.0;
     public event Action? StateChanged;
     public Brush? PaperShadow { get; set; } = new SolidColorBrush(Color.FromArgb(70, 0, 0, 0));
@@ -128,6 +130,11 @@ public sealed class DocumentView : FrameworkElement
                 _cache[i] = g;
             }
             dc.DrawDrawing(g);
+            if (ShowTableGrid && L.Pages[i].Cells.Count > 0)
+            {
+                var gp = new Pen(new SolidColorBrush(Color.FromArgb(160, 140, 140, 140)), 0.6) { DashStyle = DashStyles.Dash }; gp.Freeze();
+                foreach (var (cx, cy, cw, ch) in L.Pages[i].Cells) dc.DrawRectangle(null, gp, new Rect(cx, cy, cw, ch));
+            }
             if (_s.EditingHF) dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)), null, new Rect(0, L.Pages[i].MarT, L.Pages[i].Width, L.Pages[i].Height - L.Pages[i].MarT - L.Pages[i].MarB));
             if (_s.HasSelection)
                 foreach (var l in L.Pages[i].Lines)
