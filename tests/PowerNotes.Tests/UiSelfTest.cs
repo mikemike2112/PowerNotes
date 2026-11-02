@@ -9,6 +9,7 @@ public class UiSelfTest
     [Fact]
     public void RealApp_SelfTest_Passes()
     {
+        using var lk = UiLock.Acquire();
         var exe = Directory.GetFiles(Path.Combine(TestPaths.Root, "src", "PowerNotes.App", "bin"), "PowerNotes.exe", SearchOption.AllDirectories).OrderByDescending(File.GetLastWriteTimeUtc).First();
         var dir = Path.Combine(TestPaths.Root, "artifacts", "selftest");
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
