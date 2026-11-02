@@ -48,3 +48,5 @@ Le finestre proprie (salvataggio, avvisi, Uniforma, Scudo privacy) non sono più
 - Grassetto/corsivo sintetizzati (doppia stampa/inclinazione) se il font non ha la variante; qualità inferiore a un vero font Bold.
 - Font `.ttc` incorporati nel PDF estraendo il singolo font.
 - Nessuna correzione ortografica, nessun campo oltre a PAGE/NUMPAGES.
+
+- Note di chiusura: elencate dopo l'ultimo blocco del corpo (non a fine sezione), numerazione sempre romana minuscola continua; le impostazioni `endnotePr` per sezione non sono valutate. Collegamenti: il testo è colorato/sottolineato dallo stile `Hyperlink`; i collegamenti in intestazioni, piè di pagina e note non si creano dall'interfaccia.

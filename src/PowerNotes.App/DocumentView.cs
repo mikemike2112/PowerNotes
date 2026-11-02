@@ -26,6 +26,8 @@ public sealed class DocumentView : FrameworkElement
     public bool ShowTableGrid { get; set; }
     public double Zoom { get; private set; } = 1.0;
     public event Action? StateChanged;
+    /// <summary>Ctrl+clic su un collegamento: indirizzo (o «#segnalibro»).</summary>
+    public event Action<string>? LinkClicked;
     public Brush? PaperShadow { get; set; } = new SolidColorBrush(Color.FromArgb(70, 0, 0, 0));
 
     double Scale => Zoom * 96.0 / 72.0;
@@ -188,6 +190,7 @@ public sealed class DocumentView : FrameworkElement
         Focus();
         bool started = ClickAt(e.GetPosition(this), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift), e.ClickCount);
         _dragging = started && e.ClickCount == 1;
+        if (started && e.ClickCount == 1 && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && _s?.HyperlinkAt() is { } link) { _dragging = false; LinkClicked?.Invoke(link); }
         if (_dragging) CaptureMouse();
         e.Handled = true;
     }
