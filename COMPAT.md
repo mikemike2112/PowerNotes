@@ -50,3 +50,5 @@ Le finestre proprie (salvataggio, avvisi, Uniforma, Scudo privacy) non sono più
 - Nessuna correzione ortografica, nessun campo oltre a PAGE/NUMPAGES.
 
 - Note di chiusura: elencate dopo l'ultimo blocco del corpo (non a fine sezione), numerazione sempre romana minuscola continua; le impostazioni `endnotePr` per sezione non sono valutate. Collegamenti: il testo è colorato/sottolineato dallo stile `Hyperlink`; i collegamenti in intestazioni, piè di pagina e note non si creano dall'interfaccia.
+
+- Bordi e sfondo di paragrafo: disegnati come linea singola (stili doppio/punteggiato trattati come singolo) e rettangolo dall'inizio della prima alla fine dell'ultima riga; lo spazio tra paragrafi consecutivi con lo stesso sfondo non è riempito e i bordi «between»/«bar» non sono valutati.

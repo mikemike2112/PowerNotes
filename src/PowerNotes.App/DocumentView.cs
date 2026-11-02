@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,6 +27,8 @@ public sealed class DocumentView : FrameworkElement
     public bool ShowTableGrid { get; set; }
     /// <summary>Griglia della pagina (solo a schermo): linee ogni 0,5 cm.</summary>
     public bool ShowGrid { get; set; }
+    /// <summary>Mostra tutto: ¶ a fine paragrafo, punti sugli spazi, frecce sulle tabulazioni, ↵ sugli a capo (solo a schermo).</summary>
+    public bool ShowMarks { get; set; }
     /// <summary>Modalità di lettura: il documento si legge e si copia ma non si modifica.</summary>
     public bool ReadOnly { get; set; }
     /// <summary>Pagine affiancate per riga (1 = una sola colonna).</summary>
@@ -154,6 +157,7 @@ public sealed class DocumentView : FrameworkElement
                 for (double gx = Step; gx < L.Pages[i].Width; gx += Step) dc.DrawLine(gl, new Point(gx, 0), new Point(gx, L.Pages[i].Height));
                 for (double gy = Step; gy < L.Pages[i].Height; gy += Step) dc.DrawLine(gl, new Point(0, gy), new Point(L.Pages[i].Width, gy));
             }
+            if (ShowMarks) DrawMarks(dc, L.Pages[i], ppd);
             if (ShowTableGrid && L.Pages[i].Cells.Count > 0)
             {
                 var gp = new Pen(new SolidColorBrush(Color.FromArgb(160, 140, 140, 140)), 0.6) { DashStyle = DashStyles.Dash }; gp.Freeze();
@@ -177,6 +181,36 @@ public sealed class DocumentView : FrameworkElement
                 dc.DrawRectangle(Brushes.Black, null, new Rect(cx, caretLine.Y, 0.9 / Scale * 1.0 + 0.4, caretLine.Height));
             }
             dc.Pop(); dc.Pop();
+        }
+    }
+
+    static readonly Brush MarkBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x5b, 0x8d, 0xc9)));
+    static Brush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
+
+    static void Mark(DrawingContext dc, string text, double x, double baseline, double size, double ppd)
+    {
+        var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI Symbol"), size, MarkBrush, ppd);
+        dc.DrawText(ft, new Point(x, baseline - ft.Baseline));
+    }
+
+    void DrawMarks(DrawingContext dc, PowerNotes.Core.Layout.Page pg, double ppd)
+    {
+        foreach (var l in pg.Lines)
+        {
+            double size = Math.Clamp((l.Segs.FirstOrDefault(x => !x.Synthetic)?.Fmt.EffSize ?? 11) * 0.9, 6, 20), endX = l.Left;
+            foreach (var sg in l.Segs)
+            {
+                if (sg.Synthetic) continue;
+                endX = sg.X + sg.Width;
+                if (sg.Kind == LeafKind.Tab) Mark(dc, "\u2192", sg.X + 1, l.Baseline, size, ppd);
+                else if (sg.Kind == LeafKind.Break) Mark(dc, "\u21B5", sg.X, l.Baseline, size, ppd);
+                else if (sg.Kind == LeafKind.Text && sg.Text.Length > 0 && sg.Text.All(c => c == ' '))
+                {
+                    double w = sg.Width / sg.Text.Length;
+                    for (int k = 0; k < sg.Text.Length; k++) Mark(dc, "\u00B7", sg.X + k * w + w / 2 - size * 0.12, l.Baseline - size * 0.1, size, ppd);
+                }
+            }
+            if (l.LastOfPara) Mark(dc, "\u00B6", endX + 1, l.Baseline, size, ppd);
         }
     }
 

@@ -27,7 +27,8 @@ public partial class MainWindow
     Button? _maxBtn;
     readonly List<(string Label, Action Act, Button Btn)> _cmds = new();
     int _tab;
-    Button? _printViewBtn, _readBtn, _readBtnRibbon, _printBtnRibbon;
+    Button? _printViewBtn, _readBtn, _readBtnRibbon, _printBtnRibbon, _painterBtn;
+    DocumentFormat.OpenXml.Wordprocessing.RunProperties? _painter;
     CheckBox? _rulerChk;
     bool _read;
     int _navVer = -1;
@@ -42,6 +43,11 @@ public partial class MainWindow
         View.Scroller = Scroller;
         View.LinkClicked += OpenLink;
         NavList.SelectionChanged += NavList_Selected;
+        View.PreviewMouseLeftButtonUp += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+        {
+            if (_painter == null || !_s.HasSelection) return;
+            var f = _painter; EndPainter(); Do(() => _s.ApplyFormat(f));
+        });
 
         BuildTitleBar();
         BuildRibbon();
@@ -164,7 +170,6 @@ public partial class MainWindow
         var save = Small(QuickBar, null, "save", () => SaveCore(false), "Salva (Ctrl+S)");
         var undo = Small(QuickBar, null, "undo", () => Do(() => _s.Undo()), "Annulla (Ctrl+Z)");
         var redo = Small(QuickBar, null, "redo", () => Do(() => _s.Redo()), "Ripeti (Ctrl+Y)");
-        Small(QuickBar, null, "caret", () => { }, null, false);
         System.Windows.Automation.AutomationProperties.SetName(undo, "Annulla"); System.Windows.Automation.AutomationProperties.SetName(redo, "Ripeti"); System.Windows.Automation.AutomationProperties.SetName(save, "Salva");
         TitleLabel = new TextBlock { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, FontSize = 13 };
         QuickBar.Children.Add(TitleLabel);
@@ -232,7 +237,7 @@ public partial class MainWindow
         var home = NewTab("Home");
         var g = Group(home, "Appunti", () => { });
         Large(g, "Incolla", "paste", () => Do(Paste), "Incolla (Ctrl+V)");
-        var ap = new StackPanel(); Small(ap, "Taglia", "cut", () => Do(Cut), "Taglia (Ctrl+X)"); Small(ap, "Copia", "copy", () => Do(Copy), "Copia (Ctrl+C)"); Small(ap, "Copia formato", "brush", () => { }, null, false); g.Children.Add(ap);
+        var ap = new StackPanel(); Small(ap, "Taglia", "cut", () => Do(Cut), "Taglia (Ctrl+X)"); Small(ap, "Copia", "copy", () => Do(Copy), "Copia (Ctrl+C)"); Small(ap, "Copia formato", "brush", () => FormatPainter_Click(), "Copia formato: clic qui con il cursore sul testo di origine, poi seleziona il testo di destinazione"); _painterBtn = (Button)ap.Children[^1]; g.Children.Add(ap);
 
         g = Group(home, "Carattere", () => CharDialog());
         FontBox = new ComboBox { Width = 150, IsEditable = true, ToolTip = "Tipo di carattere", Name = "FontBox", ItemsSource = System.Windows.Media.Fonts.SystemFontFamilies.Select(f => f.Source).OrderBy(x => x).ToList() };
@@ -245,7 +250,9 @@ public partial class MainWindow
         Small(r1, null, "generic", () => Do(() => _s.StepSize(true)), "Ingrandisci carattere (Ctrl+>)").Content = new TextBlock { Text = "A▲", FontSize = 11 };
         Small(r1, null, "generic", () => Do(() => _s.StepSize(false)), "Riduci carattere (Ctrl+<)").Content = new TextBlock { Text = "A▼", FontSize = 11 };
         Small(r1, null, "generic", () => Do(() => _s.ClearFormatting()), "Cancella formattazione").Content = new TextBlock { Text = "A✕", FontSize = 11 };
-        Small(r1, null, "generic", () => { }, null, false).Content = new TextBlock { Text = "Aa", FontSize = 12 };
+        Button? aaBtn = null;
+        aaBtn = Small(r1, null, "generic", () => Menu(aaBtn!, ("Maiuscola a inizio frase", () => Do(() => _s.ChangeCase(CaseMode.Sentence))), ("minuscole", () => Do(() => _s.ChangeCase(CaseMode.Lower))), ("MAIUSCOLE", () => Do(() => _s.ChangeCase(CaseMode.Upper))), ("Iniziali Maiuscole", () => Do(() => _s.ChangeCase(CaseMode.Title))), ("iNVERTI MAIUSCOLE/MINUSCOLE", () => Do(() => _s.ChangeCase(CaseMode.Toggle)))), "Maiuscole/minuscole");
+        aaBtn.Content = new TextBlock { Text = "Aa", FontSize = 12 };
         var r2 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
         BoldBtn = Toggle(r2, "G", "Grassetto", () => Do(() => _s.ToggleBold()), null, FontWeights.Bold);
         ItalicBtn = Toggle(r2, "C", "Corsivo", () => Do(() => _s.ToggleItalic()), null, null, FontStyles.Italic);
@@ -261,11 +268,13 @@ public partial class MainWindow
         var p1 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
         Small(p1, null, "bullets", () => Do(() => _s.ToggleList("bullet")), "Elenchi puntati");
         Small(p1, null, "numbers", () => Do(() => _s.ToggleList("decimal")), "Elenchi numerati");
-        Small(p1, null, "multilevel", () => { }, null, false);
+        Small(p1, null, "multilevel", () => Do(() => _s.ToggleList("multilevel")), "Elenco a più livelli (1. 1.1. 1.1.1.)");
         Small(p1, null, "outdent", () => Do(() => _s.ChangeIndent(-36)), "Riduci rientro");
         Small(p1, null, "indent", () => Do(() => _s.ChangeIndent(36)), "Aumenta rientro");
-        Small(p1, null, "sort", () => { }, null, false);
-        Small(p1, null, "pilcrow", () => { }, null, false);
+        Button? sortBtn = null;
+        sortBtn = Small(p1, null, "sort", () => Menu(sortBtn!, ("Ordina paragrafi A-Z", () => Do(() => _s.SortParagraphs(false))), ("Ordina paragrafi Z-A", () => Do(() => _s.SortParagraphs(true)))), "Ordina paragrafi selezionati");
+        Button? pilBtn = null;
+        pilBtn = Small(p1, null, "pilcrow", () => { View.ShowMarks = !View.ShowMarks; Mark(pilBtn!, View.ShowMarks); View.InvalidateVisual(); }, "Mostra tutto: segni di paragrafo, spazi, tabulazioni e a capo");
         var p2 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
         AlLeft = Toggle(p2, "", "Allinea a sinistra", () => Do(() => _s.SetAlignment(Align.Left)), "alignL");
         AlCenter = Toggle(p2, "", "Allinea al centro", () => Do(() => _s.SetAlignment(Align.Center)), "alignC");
@@ -274,7 +283,9 @@ public partial class MainWindow
         LineBox = new ComboBox { Width = 64, ToolTip = "Interlinea e spaziatura paragrafo", Name = "LineBox", ItemsSource = new[] { "1,0", "1,08", "1,15", "1,5", "2,0", "2,5", "3,0" } };
         LineBox.DropDownClosed += (_, _) => Line_Changed(null, EventArgs.Empty);
         p2.Children.Add(LineBox);
-        Small(p2, null, "shading", () => { }, null, false); Small(p2, null, "borders", () => { }, null, false);
+        Button? shBtn = null, bdBtn = null;
+        shBtn = Small(p2, null, "shading", () => ShadeMenu(shBtn!), "Sfondo del paragrafo");
+        bdBtn = Small(p2, null, "borders", () => Menu(bdBtn!, ("Nessun bordo", () => Do(() => _s.SetParaBorders(BorderEdge.None))), ("Contorno", () => Do(() => _s.SetParaBorders(BorderEdge.Box))), ("Bordo superiore", () => Do(() => _s.SetParaBorders(BorderEdge.Top))), ("Bordo inferiore", () => Do(() => _s.SetParaBorders(BorderEdge.Bottom))), ("Bordo sinistro", () => Do(() => _s.SetParaBorders(BorderEdge.Left))), ("Bordo destro", () => Do(() => _s.SetParaBorders(BorderEdge.Right)))), "Bordi del paragrafo");
         g.Children.Add(Col(p1, p2));
 
         g = Group(home, "Stili", () => { });
@@ -477,6 +488,31 @@ public partial class MainWindow
     void NavList_Selected(object? s, SelectionChangedEventArgs e)
     {
         if (NavList.SelectedItem is ListBoxItem { Tag: DocumentFormat.OpenXml.Wordprocessing.Paragraph p }) { NavList.SelectedItem = null; Do(() => _s.SetCaret(p, 0)); }
+    }
+
+    /// <summary>Copia formato: il primo clic cattura il formato del testo sotto il cursore, la prossima selezione col mouse lo riceve; un secondo clic annulla.</summary>
+    void FormatPainter_Click()
+    {
+        if (_painter != null) { EndPainter(); return; }
+        _painter = _s.CaptureFormat(); View.Cursor = Cursors.Cross;
+        if (_painterBtn != null) Mark(_painterBtn, true);
+        View.Focus();
+    }
+
+    void EndPainter() { _painter = null; View.Cursor = Cursors.IBeam; if (_painterBtn != null) Mark(_painterBtn, false); }
+
+    void ShadeMenu(UIElement anchor)
+    {
+        var m = new ContextMenu();
+        foreach (var hex in Palette)
+        {
+            var h = hex;
+            var item = new MenuItem { Header = new Border { Width = 40, Height = 14, Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#" + h)), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1) } };
+            item.Click += (_, _) => Do(() => _s.SetParaShading(h));
+            m.Items.Add(item);
+        }
+        var none = new MenuItem { Header = "Nessuno sfondo" }; none.Click += (_, _) => Do(() => _s.SetParaShading(null)); m.Items.Add(none);
+        m.PlacementTarget = anchor; m.IsOpen = true;
     }
 
     void Shape_Click()
