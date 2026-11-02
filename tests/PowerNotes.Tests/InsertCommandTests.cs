@@ -227,4 +227,55 @@ public class InsertCommandTests
         Assert.Equal(40 * 12700, ext.Cx!.Value);
         TableCommandTests.AssertValid(d);
     }
+
+    [Fact]
+    public void LineNumbers_DrawnInMarginPerLine_RestartModes_OneUndo_Valid()
+    {
+        var (d, s) = NewDoc();
+        s.Type(string.Join("\n", Enumerable.Range(1, 5).Select(i => "riga " + i)));
+        int before = Snap(d);
+        Assert.Equal(EditorSession.LineNumMode.None, s.GetLineNumbers());
+        s.SetLineNumbers(EditorSession.LineNumMode.Continuous);
+        Assert.Equal(EditorSession.LineNumMode.Continuous, s.GetLineNumbers());
+        var nums = d.Layout().Pages[0].Prims.OfType<TextPrim>().Where(t => t.Text.All(char.IsDigit) && t.X < 60).ToList();
+        Assert.Equal(["1", "2", "3", "4", "5"], nums.Select(t => t.Text));
+        Assert.All(nums, t => Assert.True(t.X + t.Width < d.Layout().Pages[0].MarL));
+        TableCommandTests.AssertValid(d);
+        using (var d2 = Reopen(d)) Assert.Equal(5, d2.Layout().Pages[0].Prims.OfType<TextPrim>().Count(t => t.Text.All(char.IsDigit) && t.X < 60));
+        // un paragrafo che sopprime i numeri non viene contato
+        var ps = s.Paragraphs();
+        XmlOps.PPr(ps[2]).SuppressLineNumbers = new SuppressLineNumbers();
+        d.Touched();
+        Assert.Equal(4, d.Layout().Pages[0].Prims.OfType<TextPrim>().Count(t => t.Text.All(char.IsDigit) && t.X < 60));
+        s.SetLineNumbers(EditorSession.LineNumMode.None);
+        Assert.Empty(d.Layout().Pages[0].Prims.OfType<TextPrim>().Where(t => t.Text.All(char.IsDigit) && t.X < 60));
+        Assert.Empty(d.Body.Descendants<LineNumberType>());
+        s.SetLineNumbers(EditorSession.LineNumMode.RestartPage);
+        Assert.True(s.Undo()); Assert.True(s.Undo());
+    }
+
+    [Fact]
+    public void LineNumbers_RestartPageVsContinuous_AcrossPages()
+    {
+        var (d, s) = NewDoc();
+        s.Type(string.Join("\n", Enumerable.Range(1, 100).Select(i => "riga " + i)));
+        s.SetLineNumbers(EditorSession.LineNumMode.RestartPage);
+        var lay = d.Layout();
+        Assert.True(lay.Pages.Count >= 2);
+        Assert.Equal("1", lay.Pages[1].Prims.OfType<TextPrim>().First(t => t.Text.All(char.IsDigit) && t.X < lay.Pages[1].MarL).Text);
+        s.SetLineNumbers(EditorSession.LineNumMode.Continuous);
+        var first2 = d.Layout().Pages[1].Prims.OfType<TextPrim>().First(t => t.Text.All(char.IsDigit) && t.X < d.Layout().Pages[1].MarL).Text;
+        Assert.NotEqual("1", first2);
+    }
+
+    [Fact]
+    public void Headings_ListsOutlineParagraphsWithLevels()
+    {
+        var (d, s) = NewDoc();
+        s.Type("Capitolo"); s.SetStyle("Heading1"); s.Enter();
+        s.Type("corpo"); s.SetStyle("Normal"); s.Enter();
+        s.Type("Sezione"); s.SetStyle("Heading2"); s.Enter(); s.Type("fine");
+        var h = s.Headings();
+        Assert.Equal([("Capitolo", 0), ("Sezione", 1)], h.Select(x => (x.Text, x.Level)).ToArray());
+    }
 }

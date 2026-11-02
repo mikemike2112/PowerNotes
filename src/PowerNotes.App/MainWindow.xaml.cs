@@ -48,7 +48,7 @@ public partial class MainWindow : Window
     void Load(WordDoc d)
     {
         _doc?.Dispose();
-        _doc = d; _s = new EditorSession(d); _wcVersion = -1;
+        _doc = d; _s = new EditorSession(d); _wcVersion = -1; _navVer = -1;
         View.Session = _s;
         UpdateTitle(); UpdateUi();
         Scroller.ScrollToTop();
@@ -143,9 +143,11 @@ public partial class MainWindow : Window
     // ---------- scorciatoie ----------
     void OnShortcut(object sender, KeyEventArgs e)
     {
+        if (_read && e.Key == Key.Escape) { SetReadMode(false); e.Handled = true; return; }
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) return;
         if (Keyboard.FocusedElement is TextBox && !View.IsKeyboardFocused) return;
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (_read && e.Key is Key.B or Key.I or Key.U or Key.Z or Key.Y or Key.X or Key.V or Key.L or Key.E or Key.R or Key.J or Key.H or Key.Enter) { e.Handled = true; return; }   // lettura: niente modifiche
         Action? a = e.Key switch
         {
             Key.B => () => _s.ToggleBold(), Key.I => () => _s.ToggleItalic(), Key.U => () => _s.ToggleUnderline(),
@@ -419,6 +421,7 @@ public partial class MainWindow : Window
             UpdateZoomUi();
             var lm = pf.LineRule == "auto" ? pf.Line / 240 : 0; LineBox.SelectedItem = ((string[])LineBox.ItemsSource).OrderBy(x => Math.Abs(double.Parse(x.Replace(',', '.'), CultureInfo.InvariantCulture) - lm)).First() is var near && Math.Abs(double.Parse(near.Replace(',', '.'), CultureInfo.InvariantCulture) - lm) < 0.02 ? near : null;
             UpdateTitle();
+            RefreshNav();
         }
         catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { PageText.Text = "Errore di visualizzazione: " + ex.Message; }
         finally { _updating = false; }

@@ -268,4 +268,46 @@ public sealed partial class EditorSession
         XmlOps.PlaceRun(Caret.P, Caret.Off, new Run(new Drawing(xml)));
         Changed();
     }
+
+    // ---------- numeri di riga ----------
+    public enum LineNumMode { None, Continuous, RestartPage, RestartSection }
+
+    public LineNumMode GetLineNumbers()
+    {
+        var ln = SectionFor(Caret.P).GetFirstChild<LineNumberType>();
+        if (ln == null) return LineNumMode.None;
+        var r = ln.Restart?.Value;
+        return r == LineNumberRestartValues.Continuous ? LineNumMode.Continuous : r == LineNumberRestartValues.NewSection ? LineNumMode.RestartSection : LineNumMode.RestartPage;
+    }
+
+    /// <summary>Numeri di riga per tutto il documento (tutte le sezioni): spenti, continui, da riavviare a ogni pagina o a ogni sezione.</summary>
+    public void SetLineNumbers(LineNumMode mode)
+    {
+        Begin();
+        foreach (var sp in AllSections())
+        {
+            sp.GetFirstChild<LineNumberType>()?.Remove();
+            if (mode == LineNumMode.None) continue;
+            var ln = new LineNumberType { CountBy = 1, Restart = mode == LineNumMode.Continuous ? LineNumberRestartValues.Continuous : mode == LineNumMode.RestartSection ? LineNumberRestartValues.NewSection : LineNumberRestartValues.NewPage };
+            // ordine schema: dopo pgMar/paperSrc/pgBorders, prima di pgNumType/cols
+            var after = sp.Elements().LastOrDefault(e => e is PageMargin or PaperSource or PageBorders) ?? sp.Elements().LastOrDefault(e => e is PageSize or HeaderReference or FooterReference or FootnoteProperties or EndnoteProperties or SectionType);
+            if (after != null) after.InsertAfterSelf(ln); else sp.PrependChild(ln);
+        }
+        Changed();
+    }
+
+    // ---------- riquadro di spostamento ----------
+    /// <summary>Titoli del corpo (paragrafi con livello struttura 1-9, non vuoti), in ordine di documento.</summary>
+    public List<(Paragraph P, int Level, string Text)> Headings()
+    {
+        var res = new List<(Paragraph, int, string)>();
+        foreach (var p in Doc.Paragraphs())
+        {
+            var lvl = Styles.ResolvePara(p, null, out _).OutlineLevel;
+            if (lvl is < 0 or > 8) continue;
+            var t = ParaText.Text(p).Replace("\n", " ").Replace("\t", " ").Trim();
+            if (t.Length > 0) res.Add((p, lvl, t));
+        }
+        return res;
+    }
 }

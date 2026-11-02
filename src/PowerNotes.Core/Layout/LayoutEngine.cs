@@ -44,6 +44,7 @@ public sealed class LayoutEngine
         public SectionProperties? Pr;
         public double W = 612, H = 792, Top = 72, Bottom = 72, Left = 72, Right = 72, Header = 36, Footer = 36, Gutter;
         public bool TitlePg, Continuous;
+        public int LnBy; public int LnStart = 1; public double LnDist = 18; public string LnRestart = "newPage";   // numeri di riga (lnNumType); LnBy 0 = spenti
         public int Cols = 1; public double ColGap = 36;
         public double ColW => Cols > 1 ? (ContentW - ColGap * (Cols - 1)) / Cols : ContentW;
         public OpenXmlPart? HdrDefault, HdrFirst, FtrDefault, FtrFirst;
@@ -127,6 +128,32 @@ public sealed class LayoutEngine
         // intestazioni e piè di pagina: ora si conosce il totale
         int total = _res.Pages.Count;
         foreach (var (pg, sec, idx) in _pageSec) DrawHeaderFooter(pg, sec, idx, total);
+        NumberLines();
+    }
+
+    /// <summary>Numeri di riga nel margine sinistro: righe di testo del corpo (non tabelle, note, intestazioni) dei paragrafi senza «sopprimi numeri di riga».</summary>
+    void NumberLines()
+    {
+        int n = 0; SectInfo? lastSec = null;
+        foreach (var (pg, sec, idx) in _pageSec)
+        {
+            if (sec.LnBy == 0) { lastSec = sec; continue; }
+            if (n == 0 || sec.LnRestart == "newPage" || (sec.LnRestart == "newSection" && !ReferenceEquals(sec, lastSec) && idx == 0)) n = sec.LnStart - 1;
+            lastSec = sec;
+            foreach (var l in pg.Lines)
+            {
+                if (l.Story != Story.Body || l.Height <= 0 || l.Para.Ancestors<TableCell>().Any() || l.Para.Ancestors<Footnote>().Any() || l.Para.Ancestors<Endnote>().Any() || l.Para.Ancestors<TextBoxContent>().Any()) continue;
+                if (l.Para.ParagraphProperties?.SuppressLineNumbers is { } sup && (sup.Val?.Value ?? true)) continue;
+                n++;
+                if ((n - sec.LnStart) % sec.LnBy != 0) continue;
+                var fmt = (l.Segs.FirstOrDefault(x => !x.Synthetic) ?? l.Segs.FirstOrDefault())?.Fmt.Clone();
+                if (fmt == null) continue;
+                fmt.Bold = false; fmt.Italic = false; fmt.Underline = false; fmt.Strike = false; fmt.Highlight = null; fmt.VertAlign = 0;
+                string t = n.ToString(CultureInfo.InvariantCulture);
+                // ponytail: numeri a sinistra del margine di pagina (anche con più colonne) → un numero per colonna
+                pg.Prims.Add(new TextPrim { X = pg.MarL - sec.LnDist - Metrics.Width(t, fmt), Baseline = l.Baseline, Text = t, Fmt = fmt, Width = Metrics.Width(t, fmt) });
+            }
+        }
     }
 
     static IEnumerable<OpenXmlElement> Flatten(IEnumerable<OpenXmlElement> els)
@@ -156,6 +183,14 @@ public sealed class LayoutEngine
         s.TitlePg = pr.GetFirstChild<TitlePage>() is { } tp && (tp.Val?.Value ?? true);
         if (pr.GetFirstChild<Columns>() is { } cols) { s.Cols = Math.Clamp((int)(cols.ColumnCount?.Value ?? 1), 1, 12); s.ColGap = (double.TryParse(cols.Space?.Value, out var csp) ? csp : 720) / 20.0; }
         s.Continuous = pr.GetFirstChild<SectionType>()?.Val?.Value == SectionMarkValues.Continuous;
+        if (pr.GetFirstChild<LineNumberType>() is { } lnt)
+        {
+            s.LnBy = Math.Max(1, (int)(lnt.CountBy?.Value ?? 1));
+            // ponytail: Word registra l'avvio come «valore - 1» (start=0 → primo numero 1); l'attributo assente vale 1 → rifinire se serve il confronto con Word su documenti con avvio esplicito
+            s.LnStart = lnt.Start?.Value is { } lst ? lst + 1 : 1;
+            if (double.TryParse(lnt.Distance?.Value, CultureInfo.InvariantCulture, out var ld) && ld > 0) s.LnDist = ld / 20.0;
+            s.LnRestart = lnt.Restart?.InnerText ?? "newPage";
+        }
         var main = _doc.MainDocumentPart!;
         foreach (var hr in pr.Elements<HeaderReference>())
         {

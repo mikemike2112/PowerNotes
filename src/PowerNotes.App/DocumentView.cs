@@ -24,6 +24,13 @@ public sealed class DocumentView : FrameworkElement
     public ScrollViewer? Scroller { get; set; }
     /// <summary>Visualizza griglia: contorni tratteggiati delle celle di tabella (solo a schermo).</summary>
     public bool ShowTableGrid { get; set; }
+    /// <summary>Griglia della pagina (solo a schermo): linee ogni 0,5 cm.</summary>
+    public bool ShowGrid { get; set; }
+    /// <summary>Modalità di lettura: il documento si legge e si copia ma non si modifica.</summary>
+    public bool ReadOnly { get; set; }
+    /// <summary>Pagine affiancate per riga (1 = una sola colonna).</summary>
+    public int PagesPerRow { get; private set; } = 1;
+    double _maxPw;
     public double Zoom { get; private set; } = 1.0;
     public event Action? StateChanged;
     /// <summary>Ctrl+clic su un collegamento: indirizzo (o «#segnalibro»).</summary>
@@ -75,14 +82,20 @@ public sealed class DocumentView : FrameworkElement
     {
         var tops = new List<double>();
         double y = GapDip, w = 0;
+        int n = Math.Max(1, PagesPerRow);
         if (_s != null)
-            foreach (var p in _s.Layout.Pages)
+        {
+            var pages = _s.Layout.Pages;
+            for (int i = 0; i < pages.Count; i += n)
             {
-                tops.Add(y);
-                y += p.Height * Scale + GapDip;
-                w = Math.Max(w, p.Width * Scale);
+                double rowH = 0;
+                for (int j = i; j < Math.Min(pages.Count, i + n); j++) { rowH = Math.Max(rowH, pages[j].Height * Scale); w = Math.Max(w, pages[j].Width * Scale); }
+                for (int j = i; j < Math.Min(pages.Count, i + n); j++) tops.Add(y);
+                y += rowH + GapDip;
             }
-        return (w + 2 * SideDip, y, tops);
+        }
+        _maxPw = w;
+        return (n * w + (n - 1) * GapDip + 2 * SideDip, y, tops);
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -95,7 +108,9 @@ public sealed class DocumentView : FrameworkElement
     {
         var p = _s!.Layout.Pages[i];
         double pw = p.Width * Scale;
-        double left = Math.Max(SideDip, (ActualWidth - pw) / 2);
+        int n = Math.Max(1, PagesPerRow);
+        double rowW = n * _maxPw + (n - 1) * GapDip;
+        double left = Math.Max(SideDip, (ActualWidth - rowW) / 2) + (i % n) * (_maxPw + GapDip) + (_maxPw - pw) / 2;
         return new Rect(left, tops[i], pw, p.Height * Scale);
     }
 
@@ -132,6 +147,13 @@ public sealed class DocumentView : FrameworkElement
                 _cache[i] = g;
             }
             dc.DrawDrawing(g);
+            if (ShowGrid)
+            {
+                var gl = new Pen(new SolidColorBrush(Color.FromArgb(70, 90, 90, 90)), 0.4); gl.Freeze();
+                const double Step = 28.3465 / 2;
+                for (double gx = Step; gx < L.Pages[i].Width; gx += Step) dc.DrawLine(gl, new Point(gx, 0), new Point(gx, L.Pages[i].Height));
+                for (double gy = Step; gy < L.Pages[i].Height; gy += Step) dc.DrawLine(gl, new Point(0, gy), new Point(L.Pages[i].Width, gy));
+            }
             if (ShowTableGrid && L.Pages[i].Cells.Count > 0)
             {
                 var gp = new Pen(new SolidColorBrush(Color.FromArgb(160, 140, 140, 140)), 0.6) { DashStyle = DashStyles.Dash }; gp.Freeze();
@@ -179,8 +201,14 @@ public sealed class DocumentView : FrameworkElement
     {
         if (_s == null || _s.Layout.Pages.Count == 0) return null;
         var (_, _, tops) = Metrics();
-        int best = 0;
-        for (int i = 0; i < tops.Count; i++) if (p.Y >= tops[i] - GapDip / 2) best = i;
+        int best = 0; double bd = double.MaxValue;
+        for (int i = 0; i < tops.Count; i++)
+        {
+            var pr = PageRect(i, tops);
+            double dx = p.X < pr.Left ? pr.Left - p.X : p.X > pr.Right ? p.X - pr.Right : 0, dy = p.Y < pr.Top ? pr.Top - p.Y : p.Y > pr.Bottom ? p.Y - pr.Bottom : 0;
+            double d = dy * 1000 + dx;
+            if (d < bd) { bd = d; best = i; }
+        }
         var r = PageRect(best, tops);
         return (best, (p.X - r.X) / Scale, (p.Y - r.Y) / Scale);
     }
@@ -245,7 +273,7 @@ public sealed class DocumentView : FrameworkElement
     // ---- tastiera ----
     protected override void OnTextInput(TextCompositionEventArgs e)
     {
-        if (_s == null || string.IsNullOrEmpty(e.Text)) return;
+        if (_s == null || ReadOnly || string.IsNullOrEmpty(e.Text)) return;
         var t = new string(e.Text.Where(c => !char.IsControl(c) || c == '\t').ToArray());
         if (t.Length == 0) return;
         _s.Type(t); Refresh(true); e.Handled = true;
@@ -257,6 +285,7 @@ public sealed class DocumentView : FrameworkElement
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift), ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         bool edit = false, handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (ReadOnly && key is Key.Back or Key.Delete or Key.Enter or Key.Tab) { e.Handled = true; return; }
         switch (key)
         {
             case Key.Left: _s.MoveHorizontal(-1, shift, ctrl); break;
@@ -292,8 +321,19 @@ public sealed class DocumentView : FrameworkElement
         return (PageRect(i, tops), _s.Layout.Pages[i], Scale);
     }
 
+    /// <summary>Affianca n pagine per riga (1 = una colonna) e porta lo zoom perché stiano tutte nella larghezza.</summary>
+    public void FitPages(double viewportW, int n)
+    {
+        if (_s == null || _s.Layout.Pages.Count == 0) return;
+        PagesPerRow = Math.Clamp(n, 1, 4);
+        SetZoom((viewportW - 2 * SideDip - (PagesPerRow - 1) * GapDip) / (PagesPerRow * _s.Layout.Pages[0].Width) * 72.0 / 96.0);
+    }
+
+    public void SetPagesPerRow(int n) { PagesPerRow = Math.Clamp(n, 1, 4); InvalidateMeasure(); InvalidateVisual(); }
+
     public bool FitPage(double viewportW, double viewportH)
     {
+        PagesPerRow = 1;
         if (_s == null || _s.Layout.Pages.Count == 0) return false;
         var p = _s.Layout.Pages[0];
         SetZoom(Math.Min((viewportW - 2 * SideDip) / p.Width, (viewportH - 2 * GapDip) / p.Height) * 72.0 / 96.0);
@@ -302,6 +342,7 @@ public sealed class DocumentView : FrameworkElement
 
     public void FitWidth(double viewportW)
     {
+        PagesPerRow = 1;
         if (_s == null || _s.Layout.Pages.Count == 0) return;
         SetZoom((viewportW - 2 * SideDip) / _s.Layout.Pages[0].Width * 72.0 / 96.0);
     }
