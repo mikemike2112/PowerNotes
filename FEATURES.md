@@ -89,6 +89,10 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 
 ### Tabelle
 - [x] **P0** Tabella — inserimento, celle unite, righe/colonne
+- [x] **P1** Layout di tabella · Dividi celle (in 2-12 colonne, anche celle unite) e Dividi tabella (paragrafo vuoto fra le due) — test Core, un solo annulla, validatore Open XML
+- [x] **P1** Layout di tabella · Adatta (contenuto / finestra / larghezza fissa), Distribuisci righe e colonne — test Core
+- [x] **P1** Layout di tabella · Ordina (crescente/decrescente, numerico o testo, intestazione ripetuta ferma; rifiutato con celle unite), Ripeti righe di intestazione, Converti in testo (celle separate da tabulazione)
+- [x] **P1** Layout di tabella · Seleziona (cella, riga, colonna, tabella), Visualizza griglia (contorni tratteggiati a schermo), Proprietà (allineamento, larghezza %, altezza minima righe; il layout rispetta l'allineamento)
 
 ### Illustrazioni
 - [ ] **P2** Icone

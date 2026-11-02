@@ -446,6 +446,7 @@ public sealed class LayoutEngine
             }
             if (!moved && more) { NewPage(true, false, false); if (hdr > 0 && r >= hdr && hdrH < _bottom - _top) { EmitTable(t, 0, hdr, _y); _y += hdrH; } continue; }
             double sh = more ? _bottom - top : ends.Max() - top;
+            foreach (var cc in row.Cells) _pg.Cells.Add((cc.X + _colShift, top, cc.W, sh));
             for (int k = n - 1; k >= 0; k--)
             {
                 var c = row.Cells[k];
@@ -531,6 +532,7 @@ public sealed class LayoutEngine
                 if (c.Continue) continue;
                 int endRow = Math.Min(r + c.RowSpan, r1);
                 double cy = rowY[r], ch = rowY[endRow] - cy;
+                _pg.Cells.Add((c.X + _colShift, cy, c.W, ch));
                 if (c.Fill != null) _pg.Prims.Add(new RectPrim { X = c.X + _colShift, Y = cy, W = c.W, H = ch, Fill = c.Fill });
                 double off = c.VAlign == "center" ? Math.Max(0, (ch - c.MarT - c.MarB - c.ContentH) / 2) : c.VAlign == "bottom" ? Math.Max(0, ch - c.MarB - c.MarT - c.ContentH) : 0;
                 EmitBlocks(c.Content, cy + c.MarT + off);
@@ -944,6 +946,13 @@ public sealed class LayoutEngine
         int need = trs.Select(r => r.Elements<TableCell>().Sum(cc => cc.TableCellProperties?.GridSpan?.Val?.Value ?? 1) + (r.TableRowProperties?.GetFirstChild<GridBefore>()?.Val?.Value ?? 0)).DefaultIfEmpty(0).Max();
         while (grid.Count < need) grid.Add(grid.Count > 0 ? grid[^1] : 72);
         t.Grid = grid.ToArray();
+        // allineamento della tabella (jc): centro/destra rispetto all'area disponibile
+        double tot = grid.Sum();
+        if (tp?.TableJustification?.Val?.Value is { } jcv && tot < width)
+        {
+            if (jcv == TableRowAlignmentValues.Center) t.X = x + (width - tot) / 2;
+            else if (jcv == TableRowAlignmentValues.Right) t.X = x + width - tot;
+        }
         var colX = new double[grid.Count + 1];
         colX[0] = t.X + (_compat15 ? 0 : 0);
         for (int i = 0; i < grid.Count; i++) colX[i + 1] = colX[i] + grid[i];

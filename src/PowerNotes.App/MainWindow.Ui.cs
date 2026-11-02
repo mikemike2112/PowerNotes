@@ -387,7 +387,12 @@ public partial class MainWindow
         // ====== Layout di tabella (contestuale)
         var tl = NewTab("Layout di tabella", contextual: true);
         g = Group(tl, "Tabella");
-        var t1 = new StackPanel(); Stub(t1, "Seleziona", "select"); Stub(t1, "Visualizza griglia", "table"); Stub(t1, "Proprietà", "table"); g.Children.Add(t1);
+        var t1 = new StackPanel();
+        MenuBtn(t1, "Seleziona", "select", false, ("Cella", () => Do(() => _s.SelectTablePart(TableSel.Cell))), ("Riga", () => Do(() => _s.SelectTablePart(TableSel.Row))), ("Colonna", () => Do(() => _s.SelectTablePart(TableSel.Column))), ("Tabella", () => Do(() => _s.SelectTablePart(TableSel.Table))));
+        Button? gridBtn = null;
+        gridBtn = Small(t1, "Visualizza griglia", "table", () => { View.ShowTableGrid = !View.ShowTableGrid; Mark(gridBtn!, View.ShowTableGrid); View.InvalidateVisual(); }, "Mostra o nasconde i contorni delle celle senza bordi");
+        Small(t1, "Proprietà", "table", () => TableProps_Click(), "Proprietà tabella: allineamento, larghezza, altezza righe");
+        g.Children.Add(t1);
         g = Group(tl, "Righe e colonne");
         var del = Large(g, "Elimina", "delete", () => { });
         del.Click += (_, _) => Menu(del, ("Elimina riga", () => Do(() => _s.DeleteRow())), ("Elimina tabella", () => Do(() => _s.DeleteTable())));
@@ -400,11 +405,57 @@ public partial class MainWindow
         g = Group(tl, "Unione");
         var um = new StackPanel();
         Small(um, "Unisci celle", "merge", () => Do(() => { if (!_s.MergeCells()) ThemedDialog.Show(this, "Seleziona almeno due celle della stessa tabella (trascina con il mouse).", "Unisci celle"); }));
-        Stub(um, "Dividi celle", "split"); Stub(um, "Dividi tabella", "split"); g.Children.Add(um);
+        Small(um, "Dividi celle", "split", () => SplitCells_Click(), "Dividi la cella in più colonne");
+        Small(um, "Dividi tabella", "split", () => Do(() => _s.SplitTable()), "Divide la tabella alla riga del cursore");
+        g.Children.Add(um);
         g = Group(tl, "Dimensioni cella");
-        var dm = new StackPanel(); Stub(dm, "Adatta", "table"); Stub(dm, "Distribuisci righe", "table"); Stub(dm, "Distribuisci colonne", "table"); g.Children.Add(dm);
+        var dm = new StackPanel();
+        MenuBtn(dm, "Adatta", "table", false, ("Adatta al contenuto", () => Do(() => _s.AutoFit(TableFit.Content))), ("Adatta alla finestra", () => Do(() => _s.AutoFit(TableFit.Window))), ("Larghezza colonne fissa", () => Do(() => _s.AutoFit(TableFit.Fixed))));
+        Small(dm, "Distribuisci righe", "table", () => Do(() => _s.DistributeRows()), "Rende uguali le righe selezionate (o tutte)");
+        Small(dm, "Distribuisci colonne", "table", () => Do(() => _s.DistributeColumns()), "Rende uguali le colonne selezionate (o tutte)");
+        g.Children.Add(dm);
         g = Group(tl, "Dati");
-        var da = new StackPanel(); Stub(da, "Ordina", "sort"); Stub(da, "Ripeti righe di intestazione", "table"); Stub(da, "Converti in testo", "table"); g.Children.Add(da);
+        var da = new StackPanel();
+        MenuBtn(da, "Ordina", "sort", false, ("Crescente", () => Do(() => _s.SortTable(false))), ("Decrescente", () => Do(() => _s.SortTable(true))));
+        Button? hdrBtn = null;
+        hdrBtn = Small(da, "Ripeti righe di intestazione", "table", () => { Do(() => _s.ToggleRepeatHeader()); Mark(hdrBtn!, _s.HasRepeatHeader); }, "La prima riga si ripete in cima a ogni pagina");
+        Small(da, "Converti in testo", "table", () => Do(() => _s.ConvertTableToText()), "Trasforma la tabella in paragrafi separati da tabulazioni");
+        g.Children.Add(da);
+    }
+
+    /// <summary>Pulsante con menu a tendina; il nome è cercabile dalla casella Cerca (apre il menu).</summary>
+    Button MenuBtn(Panel host, string label, string icon, bool large, params (string Text, Action Act)[] items)
+    {
+        Button? b = null;
+        b = large ? Large(host, label, icon, () => Menu(b!, items)) : Small(host, label, icon, () => Menu(b!, items));
+        return b;
+    }
+
+    /// <summary>Evidenzia un pulsante a interruttore.</summary>
+    static void Mark(Control b, bool on) { if (on) b.SetResourceReference(Control.BackgroundProperty, "HoverBrush"); else b.ClearValue(Control.BackgroundProperty); }
+
+    void SplitCells_Click()
+    {
+        var d = new FormDialog(this, "Dividi celle", new FormField("Numero di colonne (2-12)", "2"));
+        if (d.ShowDialog() != true) return;
+        var v = d.Numbers();
+        if (v == null || v[0] < 2 || v[0] > 12 || v[0] != Math.Floor(v[0])) { ThemedDialog.Show(this, "Colonne da 2 a 12.", "Dividi celle"); return; }
+        Do(() => _s.SplitCell((int)v[0]));
+    }
+
+    void TableProps_Click()
+    {
+        EditorSession.TableProps pr;
+        try { pr = _s.GetTableProps(); } catch (InvalidOperationException e) { ThemedDialog.Show(this, e.Message, "Proprietà tabella"); return; }
+        var d = new FormDialog(this, "Proprietà tabella",
+            new FormField("Allineamento", pr.Align, "Sinistra", "Centro", "Destra"),
+            new FormField("Larghezza (% del testo, 0 = automatica)", pr.WidthPct.ToString()),
+            new FormField("Altezza minima righe (pt, 0 = automatica)", F(pr.RowHeightPt)));
+        if (d.ShowDialog() != true) return;
+        var v = d.Values;
+        if (!double.TryParse(v[1].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var w) || w < 0 || w > 100 || !double.TryParse(v[2].Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var h) || h < 0 || h > 1584)
+        { ThemedDialog.Show(this, "Larghezza da 0 a 100, altezza da 0 a 1584.", "Proprietà tabella"); return; }
+        Do(() => _s.SetTableProps(v[0], (int)Math.Round(w), h));
     }
 
     void Menu(FrameworkElement anchor, params (string Text, Action Act)[] items)
