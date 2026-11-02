@@ -553,6 +553,19 @@ public sealed class LayoutEngine
     {
         double paraTopY = y;
         if (from == 0 && p.Floats.Count > 0) EmitFloats(p, y, true);
+        // sfondo e bordi del paragrafo (dietro al testo)
+        if ((p.F.Fill != null || p.F.Bdr.Any(b => b != null)) && !p.Collapsed && to > from)
+        {
+            double y1 = y + Enumerable.Range(from, to - from).Sum(i => p.Lines[i].H);
+            double x0 = p.X + _colShift + Enumerable.Range(from, to - from).Min(i => p.Lines[i].Left), x1 = p.X + _colShift + Enumerable.Range(from, to - from).Max(i => p.Lines[i].Right);
+            var bd = p.F.Bdr;
+            double sl = bd[1]?.Space ?? 0, sr = bd[3]?.Space ?? 0, st = from == 0 ? bd[0]?.Space ?? 0 : 0, sb = to == p.Lines.Count ? bd[2]?.Space ?? 0 : 0;
+            if (p.F.Fill != null) _pg.Prims.Add(new RectPrim { X = x0 - sl, Y = y - st, W = x1 - x0 + sl + sr, H = y1 - y + st + sb, Fill = p.F.Fill });
+            void Ln((double W, string Color, double Space)? b, double ax, double ay, double bx, double by) { if (b is { } v) _pg.Prims.Add(new LinePrim { X1 = ax, Y1 = ay, X2 = bx, Y2 = by, Width = v.W, Color = v.Color }); }
+            if (from == 0) Ln(bd[0], x0 - sl, y - st, x1 + sr, y - st);
+            if (to == p.Lines.Count) Ln(bd[2], x0 - sl, y1 + sb, x1 + sr, y1 + sb);
+            Ln(bd[1], x0 - sl, y - st, x0 - sl, y1 + sb); Ln(bd[3], x1 + sr, y - st, x1 + sr, y1 + sb);
+        }
         for (int li = from; li < to; li++)
         {
             var l = p.Lines[li];

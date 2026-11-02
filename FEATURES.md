@@ -23,7 +23,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Incolla — testo e formattazione (tra documenti di PowerNotes)
 - [x] **P0** Taglia — idem
 - [x] **P0** Copia — idem
-- [ ] **P1** Copia formato
+- [x] **P1** Copia formato — clic col cursore sul testo di origine, poi la selezione col mouse riceve il formato diretto del carattere (non quello di paragrafo); secondo clic annulla; un solo annulla — test Core
 - [ ] **P2** Appunti di Office...
 
 ### Carattere
@@ -41,7 +41,7 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Colore carattere
 - [x] **P0** Tipo di carattere
 - [x] **P0** Dimensione carattere
-- [ ] **P1** Maiuscole/minuscole
+- [x] **P1** Maiuscole/minuscole — inizio frase, minuscole, MAIUSCOLE, Iniziali Maiuscole, inverti; sulla selezione o sulla parola al cursore, formattazione e lunghezza intatte, un solo annulla — test Core
 - [ ] **P2** Effetti testo e tipografia
 
 ### Paragrafo
@@ -49,16 +49,16 @@ Inventario ricavato dal vero Word con UI Automation (`tools/inventory-ribbon.ps1
 - [x] **P0** Elenchi numerati
 - [x] **P0** Riduci rientro
 - [x] **P0** Aumenta rientro
-- [ ] **P1** Ordina...
-- [ ] **P1** Mostra tutto
+- [x] **P1** Ordina... — paragrafi selezionati A-Z / Z-A (consecutivi, stesso blocco; rifiutato attraverso tabelle e interruzioni di sezione), un solo annulla — test Core
+- [x] **P1** Mostra tutto — ¶, punti sugli spazi, frecce sulle tabulazioni e ↵ sugli a capo, solo a schermo
 - [x] **P0** Allinea a sinistra
 - [x] **P0** Allinea al centro
 - [x] **P0** Allinea a destra
 - [x] **P0** Giustifica
-- [ ] **P1** Bordi
+- [x] **P1** Bordi — paragrafo: nessuno, contorno o singolo lato (attiva/disattiva), linea singola 0,5 pt; il layout li disegna (schermo, PDF, stampa) — test Core + validatore
 - [x] **P0** Paragrafo...
-- [ ] **P1** Sfondo
-- [x] **P0** Elenco a più livelli — livelli con Aumenta/Riduci rientro o Tab
+- [x] **P1** Sfondo — paragrafo, palette di 12 colori o nessuno; disegnato dal layout — test Core + validatore
+- [x] **P0** Elenco a più livelli — pulsante dedicato (1. 1.1. 1.1.1.); livelli con Aumenta/Riduci rientro o Tab
 - [x] **P0** Interlinea e spaziatura paragrafo — finestra Paragrafo e menu interlinea
 
 ### Stili

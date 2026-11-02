@@ -37,7 +37,9 @@ public sealed class ParaFmt
     public int? NumId, Ilvl;
     public string? StyleId;
     public int OutlineLevel = 9;
-    public ParaFmt Clone() { var c = (ParaFmt)MemberwiseClone(); c.Tabs = new(Tabs); return c; }
+    public string? Fill;                                         // sfondo del paragrafo (RRGGBB)
+    public (double W, string Color, double Space)?[] Bdr = new (double, string, double)?[4];   // bordi sopra, sinistra, sotto, destra
+    public ParaFmt Clone() { var c = (ParaFmt)MemberwiseClone(); c.Tabs = new(Tabs); c.Bdr = ((double, string, double)?[])Bdr.Clone(); return c; }
 }
 
 public sealed class NumLevel
@@ -151,6 +153,16 @@ public sealed class StyleResolver
                 case WidowControl k: p.WidowControl = k.Val?.Value ?? true; break;
                 case ContextualSpacing k: p.ContextualSpacing = k.Val?.Value ?? true; break;
                 case OutlineLevel o: p.OutlineLevel = o.Val?.Value ?? 9; break;
+                case Shading sh: p.Fill = sh.Fill?.Value is { } fill && fill != "auto" ? fill : null; break;
+                case ParagraphBorders pb:
+                    void B(int i, BorderType? b)
+                    {
+                        if (b == null) return;
+                        var v = b.Val?.InnerText;
+                        p.Bdr[i] = v is "nil" or "none" ? null : (Math.Max(0.5, (b.Size?.Value ?? 4) / 8.0), b.Color?.Value is { Length: 6 } c && c != "auto" ? c : "000000", b.Space?.Value ?? 0);
+                    }
+                    B(0, pb.TopBorder); B(1, pb.LeftBorder); B(2, pb.BottomBorder); B(3, pb.RightBorder);
+                    break;
                 case NumberingProperties np:
                     if (np.NumberingId?.Val?.Value is { } nid) p.NumId = nid;
                     if (np.NumberingLevelReference?.Val?.Value is { } il) p.Ilvl = il;
