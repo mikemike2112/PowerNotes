@@ -14,7 +14,7 @@ public sealed class LayoutEngine
 {
     // ---- strutture intermedie ----
     abstract class Block { public double Height; }
-    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; }
+    sealed class Atom { public char K; /* w parola, s spazi, t tab, b a capo, p page break, i immagine */ public string Text = ""; public RunFmt Fmt = new(); public double W; public int Start, Len; public bool Synth; public string? MetricFont; public ImagePart? Img; public double ImgH; public int Spaces; public char TabKind = 'l'; public long Note; /* id nota a piè di pagina di cui questo atomo è il richiamo */ }
     sealed class SegL { public Atom A = null!; public double X; public double W; }
     sealed class LineL { public double NatH; public double H, Base; public List<SegL> Segs = new(); public int Start, End; public bool PageBreakAfter, Last; public double Left, Right; }
     sealed class ParaL : Block { public List<FloatL> Floats = new(); public Story Story; public bool Collapsed; public Paragraph P = null!; public ParaFmt F = null!; public List<LineL> Lines = new(); public double Before, After, X, Width; }
@@ -32,6 +32,8 @@ public sealed class LayoutEngine
         public int PageNo = 1, NumPages = 1;
         public Dictionary<int, int[]> Counters = new();
         public Dictionary<Run, RunFmt> RunCache = new();
+        public Dictionary<long, int>? Notes;   // solo corpo: id nota → numero progressivo
+        public int MarkNo;                      // dentro una nota: numero del suo richiamo
         public Action<RunFmt>? CondRun;   // formattazione condizionale dello stile tabella (prima riga in grassetto, ecc.)
     }
 
@@ -60,6 +62,12 @@ public sealed class LayoutEngine
     SectInfo _sec = null!;
     int _secPageIdx;
     readonly List<(Page pg, SectInfo sec, int idxInSec)> _pageSec = new();
+    // note a piè di pagina. ponytail: solo note nei paragrafi del corpo (non in tabelle), niente note di chiusura → estendere CommitNotes ai blocchi di cella
+    const double NoteSep = 8;
+    Dictionary<long, Footnote>? _noteSrc;
+    readonly Dictionary<long, List<Block>> _noteCache = new();
+    readonly List<long> _pageNotes = new();
+    double _noteTotal, _pageBottom;
 
     LayoutEngine(WordprocessingDocument doc)
     {
@@ -81,7 +89,7 @@ public sealed class LayoutEngine
     {
         var main = _doc.MainDocumentPart ?? throw new InvalidDataException("Documento senza parte principale.");
         var body = main.Document?.Body;
-        _body = new Ctx { St = _st, Part = main };
+        _body = new Ctx { St = _st, Part = main, Notes = new() };
         var sections = new List<(SectInfo sec, List<OpenXmlElement> blocks)>();
         var cur = new List<OpenXmlElement>();
         SectInfo? prev = null;
@@ -111,6 +119,7 @@ public sealed class LayoutEngine
                 built.Add(b is Paragraph p ? BuildPara(p, _left, _width, null, _body) : BuildTable((Table)b, _left, _width, _body));
             PlaceBlocks(built);
         }
+        FlushNotes();
         if (_res.Pages.Count == 0) { _sec = ReadSect(null, null); NewPage(false, true, true); }
         // intestazioni e piè di pagina: ora si conosce il totale
         int total = _res.Pages.Count;
@@ -210,6 +219,7 @@ public sealed class LayoutEngine
             _col++; _colShift = _col * (_sec.ColW + _sec.ColGap); _y = _top; _pageHasBody = false; _hardTop = false;   // colonna successiva sulla stessa pagina
             return;
         }
+        FlushNotes();
         _col = 0; _colShift = 0;
         _secPageIdx = first ? 0 : _secPageIdx + 1;
         _pg = new Page { Index = _res.Pages.Count, Number = _res.Pages.Count + 1, Width = _sec.W, Height = _sec.H, MarL = _sec.Left + _sec.Gutter, MarR = _sec.Right, MarT = _sec.Top, MarB = _sec.Bottom };
@@ -219,6 +229,7 @@ public sealed class LayoutEngine
         double ftrH = StackHeight(BuildHF(FtrFor(_sec, _secPageIdx), _sec, 1, 1));
         _top = Math.Max(_sec.Top, hdrH > 0 ? _sec.Header + hdrH : 0);
         _bottom = Math.Min(_sec.H - _sec.Bottom, ftrH > 0 ? _sec.H - _sec.Footer - ftrH : double.MaxValue);
+        _pageBottom = _bottom;
         _left = _sec.Left + _sec.Gutter; _width = _sec.ColW;
         _y = _top; _pageHasBody = false; _hardTop = hard;
     }
@@ -283,7 +294,7 @@ public sealed class LayoutEngine
         {
             double avail = _bottom - _y;
             int k = 0; double h = 0;
-            while (i + k < n && h + p.Lines[i + k].H <= avail + 0.01) { h += p.Lines[i + k].H; k++; }
+            while (i + k < n && h + p.Lines[i + k].H + Reserve(p, i, i + k + 1) <= avail + 0.01) { h += p.Lines[i + k].H; k++; }
             if (i + k < n)
             {
                 int rem = n - i;
@@ -307,6 +318,7 @@ public sealed class LayoutEngine
                 yy += p.Lines[e].H; e++;
                 if (p.Lines[e - 1].PageBreakAfter) break;
             }
+            CommitNotes(p, i, e);
             EmitPara(p, i, e, _y);
             _pageHasBody = true;
             _y = yy;
@@ -330,6 +342,8 @@ public sealed class LayoutEngine
             for (int j = r; j <= end; j++) foreach (var c in t.Rows[j].Cells) end = Math.Max(end, j + c.RowSpan - 1);
             double h = 0;
             for (int j = r; j <= end; j++) h += t.Rows[j].H;
+            // ponytail: si spezza solo la riga più alta di una pagina intera (le altre vanno alla pagina dopo, come prima) → spezzare ogni riga che non sta, rispettando cantSplit
+            if (end == r && h > _bottom - _top + 0.01 && t.Rows[r].Cells.All(x => x.RowSpan == 1 && !x.Continue)) { SplitRow(t, r, hdr, hdrH); r++; continue; }
             if (_y + h > _bottom + 0.01 && _pageHasBody)
             {
                 NewPage(true, false, false);
@@ -338,6 +352,112 @@ public sealed class LayoutEngine
             EmitTable(t, r, end + 1, _y);
             _y += h; _pageHasBody = true;
             r = end + 1;
+        }
+    }
+
+    // ================= note a piè di pagina =================
+    Footnote? FindNote(long id)
+    {
+        _noteSrc ??= (_doc.MainDocumentPart?.FootnotesPart?.Footnotes?.Elements<Footnote>() ?? Enumerable.Empty<Footnote>())
+            .Where(f => f.Id?.Value != null && (f.Type?.Value is null || f.Type.Value == FootnoteEndnoteValues.Normal)).GroupBy(f => f.Id!.Value).ToDictionary(g => g.Key, g => g.First());
+        return _noteSrc.GetValueOrDefault(id);
+    }
+
+    List<Block> NoteBlocks(long id)
+    {
+        if (_noteCache.TryGetValue(id, out var b)) return b;
+        var c = new Ctx { St = _st, Part = _doc.MainDocumentPart!.FootnotesPart!, MarkNo = _body.Notes!.GetValueOrDefault(id) };
+        b = new List<Block>();
+        foreach (var p in FindNote(id)!.Elements<Paragraph>()) b.Add(BuildPara(p, _sec.Left + _sec.Gutter, _sec.ContentW, null, c));
+        return _noteCache[id] = b;
+    }
+
+    /// <summary>Atomo sintetico (numero in apice) per il richiamo di nota nel corpo o per il segno di nota dentro la nota.</summary>
+    void AddNoteMark(List<Atom> atoms, Run r, long id, RunFmt baseRun, Ctx c)
+    {
+        int no;
+        if (id == -1) no = c.MarkNo;
+        else if (c.Notes == null || FindNote(id) == null) return;
+        else if (!c.Notes.TryGetValue(id, out no)) c.Notes[id] = no = c.Notes.Count + 1;
+        if (no == 0) return;
+        var f = c.St.ResolveRun(baseRun, r).Clone(); if (f.VertAlign == 0) f.VertAlign = 1;
+        var txt = no.ToString();
+        atoms.Add(new Atom { K = 'w', Text = txt, Fmt = f, W = Metrics.Width(txt, f), Synth = true, Note = id == -1 ? 0 : id });
+    }
+
+    /// <summary>Altezza da riservare in fondo alla pagina per le note dei richiami nelle righe a..b-1 (più il separatore se è la prima nota della pagina).</summary>
+    double Reserve(ParaL p, int a, int b)
+    {
+        double h = 0; bool any = false;
+        for (int i = a; i < b; i++)
+            foreach (var s in p.Lines[i].Segs)
+                if (s.A.Note != 0) { any = true; h += StackH(NoteBlocks(s.A.Note)); }
+        return any && _pageNotes.Count == 0 ? h + NoteSep : h;
+    }
+
+    void CommitNotes(ParaL p, int a, int b)
+    {
+        double h = Reserve(p, a, b);
+        if (h == 0) return;
+        for (int i = a; i < b; i++) foreach (var s in p.Lines[i].Segs) if (s.A.Note != 0) _pageNotes.Add(s.A.Note);
+        _bottom -= h; _noteTotal += h;
+    }
+
+    void FlushNotes()
+    {
+        if (_pageNotes.Count == 0 || _pg == null) return;
+        var save = _colShift; _colShift = 0;
+        double y0 = _pageBottom - _noteTotal;
+        _pg.Prims.Add(new LinePrim { X1 = _pg.MarL, X2 = _pg.MarL + 144, Y1 = y0 + 3, Y2 = y0 + 3, Width = 0.5 });
+        EmitBlocks(_pageNotes.SelectMany(NoteBlocks).ToList(), y0 + NoteSep);
+        _colShift = save; _pageNotes.Clear(); _noteTotal = 0;
+    }
+
+    /// <summary>Riga di tabella più alta di una pagina: il contenuto di ogni cella prosegue a fette sulle pagine successive.</summary>
+    void SplitRow(TableL t, int r, int hdr, double hdrH)
+    {
+        var row = t.Rows[r];
+        int n = row.Cells.Count;
+        var bi = new int[n]; var li = new int[n];
+        while (true)
+        {
+            double top = _y;
+            var ends = new double[n]; var marks = new int[n]; bool more = false, moved = false;
+            for (int k = 0; k < n; k++)
+            {
+                var c = row.Cells[k];
+                double y = top + c.MarT, y0 = y; marks[k] = _pg.Prims.Count;
+                while (bi[k] < c.Content.Count)
+                {
+                    if (c.Content[bi[k]] is ParaL p)
+                    {
+                        double ys = y + (li[k] == 0 ? p.Before : 0), yy = ys; int e = li[k];
+                        while (e < p.Lines.Count && yy + p.Lines[e].H <= _bottom + 0.01) { yy += p.Lines[e].H; e++; }
+                        if (e == li[k] && !_pageHasBody && y == y0) { yy += p.Lines[e].H; e++; }   // pagina vuota: almeno una riga
+                        if (e > li[k]) { EmitPara(p, li[k], e, ys); moved = true; y = yy; }
+                        li[k] = e;
+                        if (e < p.Lines.Count) break;
+                        y += p.After; bi[k]++; li[k] = 0;
+                    }
+                    else { var tb = (TableL)c.Content[bi[k]]; EmitTable(tb, 0, tb.Rows.Count, y); y += tb.Height; bi[k]++; moved = true; }
+                }
+                ends[k] = y + c.MarB;
+                more |= bi[k] < c.Content.Count;
+            }
+            if (!moved && more) { NewPage(true, false, false); if (hdr > 0 && r >= hdr && hdrH < _bottom - _top) { EmitTable(t, 0, hdr, _y); _y += hdrH; } continue; }
+            double sh = more ? _bottom - top : ends.Max() - top;
+            for (int k = n - 1; k >= 0; k--)
+            {
+                var c = row.Cells[k];
+                if (c.Fill != null) _pg.Prims.Insert(marks[k], new RectPrim { X = c.X + _colShift, Y = top, W = c.W, H = sh, Fill = c.Fill });
+                void Edge(Bdr? b, double x1, double y1, double x2, double y2) { if (b != null) _pg.Prims.Add(new LinePrim { X1 = x1 + _colShift, Y1 = y1, X2 = x2 + _colShift, Y2 = y2, Width = b.W, Color = b.Color }); }
+                Edge(c.B[0], c.X, top, c.X + c.W, top); Edge(c.B[2], c.X, top + sh, c.X + c.W, top + sh);
+                Edge(c.B[1], c.X, top, c.X, top + sh); Edge(c.B[3], c.X + c.W, top, c.X + c.W, top + sh);
+            }
+            _pageHasBody = true; _y = top + sh;
+            if (!more) return;
+            NewPage(true, false, false);
+            if (hdr > 0 && r >= hdr && hdrH < _bottom - _top) { EmitTable(t, 0, hdr, _y); _y += hdrH; }
         }
     }
 
@@ -488,8 +608,21 @@ public sealed class LayoutEngine
             if (lvl.Suff == "tab") atoms.Add(new Atom { K = 't', Text = "\t", Fmt = lf, Synth = true });
             else if (lvl.Suff == "space") atoms.Add(new Atom { K = 's', Text = " ", Fmt = lf, W = Metrics.Width(" ", lf), Synth = true, Spaces = 1 });
         }
+        // richiami di nota: non sono foglie (niente offset), si inseriscono come atomi sintetici nell'ordine del documento
+        var nrefs = new Queue<(Run Run, long Id)>(); Dictionary<Run, int>? ord = null;
+        foreach (var r in p.Descendants<Run>())
+        {
+            long? nid = r.GetFirstChild<FootnoteReference>()?.Id?.Value ?? (r.GetFirstChild<FootnoteReferenceMark>() != null ? -1 : null);
+            if (nid != null && r.Ancestors<Paragraph>().First() == p && !r.Ancestors<DeletedRun>().Any() && !r.Ancestors<AlternateContentFallback>().Any()) nrefs.Enqueue((r, nid.Value));
+        }
+        if (nrefs.Count > 0) ord = p.Descendants<Run>().Select((r, i) => (r, i)).ToDictionary(x => x.r, x => x.i);
+        void NotesBefore(Run? run)
+        {
+            while (nrefs.Count > 0 && (run == null || ord![nrefs.Peek().Run] < ord[run])) { var (nr, id) = nrefs.Dequeue(); AddNoteMark(atoms, nr, id, baseRun, c); }
+        }
         foreach (var leaf in ParaText.Leaves(p))
         {
+            NotesBefore(leaf.Run);
             if (!c.RunCache.TryGetValue(leaf.Run, out var f)) c.RunCache[leaf.Run] = f = c.St.ResolveRun(baseRun, leaf.Run);
             switch (leaf.Kind)
             {
@@ -525,6 +658,7 @@ public sealed class LayoutEngine
                     }
             }
         }
+        NotesBefore(null);
         para.Floats = ReadFloats(p, c);
         // testo "sopra e sotto": lo spazio dell'oggetto ancorato al paragrafo viene riservato prima del testo
         foreach (var fl in para.Floats.Where(f => f.Wrap == "topBottom" && f.VFrom == "paragraph")) para.Before += fl.H + 2 * fl.Dist;

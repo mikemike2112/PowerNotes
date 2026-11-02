@@ -293,6 +293,13 @@ public partial class MainWindow : Window
         Do(() => _s.InsertTable((int)v[0], (int)v[1]));
     }
 
+    void InsertFootnote_Click()
+    {
+        var d = new FormDialog(this, "Nota a piè di pagina", new FormField("Testo della nota", ""));
+        if (d.ShowDialog() != true) return;
+        Do(() => _s.InsertFootnote(d.Values[0].Trim()));
+    }
+
     void InsertImage_Click(object s, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog { Filter = "Immagini|*.png;*.jpg;*.jpeg;*.gif;*.bmp" };

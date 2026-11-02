@@ -57,8 +57,12 @@ public static class XmlOps
         return rp;
     }
 
+    /// <summary>Toglie i caratteri non ammessi in XML 1.0 (controlli, U+FFFE/FFFF): salvandoli il file non si scriverebbe più.</summary>
+    public static string Clean(string t) => System.Text.RegularExpressions.Regex.Replace(t, @"[^\u0009\u000A\u000D\u0020-\uFFFD]", "");
+
     public static Run MakeRun(string text, RunProperties? rpr)
     {
+        text = Clean(text);
         var r = new Run();
         if (rpr != null) r.Append(rpr.CloneNode(true));
         r.Append(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
