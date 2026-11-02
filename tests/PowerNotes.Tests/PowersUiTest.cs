@@ -10,6 +10,7 @@ public class PowersUiTest
     [Fact]
     public async Task Switch_ChangesTheme_Persists_AndCorruptSettingsDoNotCrash()
     {
+        using var lk = UiLock.Acquire();
         var exe = Directory.GetFiles(Path.Combine(TestPaths.Root, "src", "PowerNotes.App", "bin"), "PowerNotes.exe", SearchOption.AllDirectories).OrderByDescending(File.GetLastWriteTimeUtc).First();
         var dir = Path.Combine(TestPaths.Root, "artifacts", "powers"); var json = Path.Combine(dir, "result.json");
         Directory.CreateDirectory(dir); if (File.Exists(json)) File.Delete(json);
