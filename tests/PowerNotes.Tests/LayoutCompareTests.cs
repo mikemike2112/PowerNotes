@@ -17,7 +17,7 @@ public class LayoutCompareTests(ITestOutputHelper o)
     }
 
     /// <summary>Posizione verticale della prima riga di ogni paragrafo senza tabelle: scarto massimo ammesso 3 pt rispetto a Word.</summary>
-    [Theory, MemberData(nameof(Names))]
+    [Theory, MemberData(nameof(Names)), Trait("Category", "OfficeFonts")]   // metriche dei font di Office (Aptos): assenti sul runner GitHub
     public void ParagraphPositions_CloseToWord(string name)
     {
         using var d = WordDoc.Open(Path.Combine(TestPaths.Corpus, name + ".docx"));
