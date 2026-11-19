@@ -23,9 +23,11 @@ static class TestPaths
     public static JsonElement Expected(string name)
     {
         _inspect ??= JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "tests", "corpus", "office-made.inspect.json")));
-        var path = Path.Combine(Corpus, name + ".docx");
+        // Chiavi = percorsi assoluti del PC dove gira word-inspect.ps1: confronto solo sul nome file,
+        // altrimenti in un clone in un'altra cartella (runner GitHub) nessuna chiave corrisponde.
+        var file = name + ".docx";
         foreach (var p in _inspect.RootElement.EnumerateObject())
-            if (string.Equals(p.Name, path, StringComparison.OrdinalIgnoreCase)) return p.Value;
+            if (string.Equals(Path.GetFileName(p.Name), file, StringComparison.OrdinalIgnoreCase)) return p.Value;
         throw new KeyNotFoundException(name);
     }
 }
