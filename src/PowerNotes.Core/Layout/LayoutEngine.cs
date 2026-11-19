@@ -181,7 +181,7 @@ public sealed class LayoutEngine
             s.Header = (m.Header?.Value ?? 720) / 20.0; s.Footer = (m.Footer?.Value ?? 720) / 20.0; s.Gutter = (m.Gutter?.Value ?? 0) / 20.0;
         }
         s.TitlePg = pr.GetFirstChild<TitlePage>() is { } tp && (tp.Val?.Value ?? true);
-        if (pr.GetFirstChild<Columns>() is { } cols) { s.Cols = Math.Clamp((int)(cols.ColumnCount?.Value ?? 1), 1, 12); s.ColGap = (double.TryParse(cols.Space?.Value, out var csp) ? csp : 720) / 20.0; }
+        if (pr.GetFirstChild<Columns>() is { } cols) { s.Cols = Math.Clamp((int)(cols.ColumnCount?.Value ?? 1), 1, 12); s.ColGap = (double.TryParse(cols.Space?.Value, CultureInfo.InvariantCulture, out var csp) ? csp : 720) / 20.0; }
         s.Continuous = pr.GetFirstChild<SectionType>()?.Val?.Value == SectionMarkValues.Continuous;
         if (pr.GetFirstChild<LineNumberType>() is { } lnt)
         {
@@ -1038,7 +1038,7 @@ public sealed class LayoutEngine
             {
                 var w = tc.TableCellProperties?.TableCellWidth?.Width?.Value;
                 int span = tc.TableCellProperties?.GridSpan?.Val?.Value ?? 1;
-                for (int k = 0; k < span; k++) grid.Add((double.TryParse(w, out var wd) ? wd / 20.0 : 72) / span);
+                for (int k = 0; k < span; k++) grid.Add((double.TryParse(w, CultureInfo.InvariantCulture, out var wd) ? wd / 20.0 : 72) / span);
             }
         int need = trs.Select(r => r.Elements<TableCell>().Sum(cc => cc.TableCellProperties?.GridSpan?.Val?.Value ?? 1) + (r.TableRowProperties?.GetFirstChild<GridBefore>()?.Val?.Value ?? 0)).DefaultIfEmpty(0).Max();
         while (grid.Count < need) grid.Add(grid.Count > 0 ? grid[^1] : 72);

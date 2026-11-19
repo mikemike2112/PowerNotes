@@ -248,7 +248,7 @@ public class InsertCommandTests
         d.Touched();
         Assert.Equal(4, d.Layout().Pages[0].Prims.OfType<TextPrim>().Count(t => t.Text.All(char.IsDigit) && t.X < 60));
         s.SetLineNumbers(EditorSession.LineNumMode.None);
-        Assert.Empty(d.Layout().Pages[0].Prims.OfType<TextPrim>().Where(t => t.Text.All(char.IsDigit) && t.X < 60));
+        Assert.DoesNotContain(d.Layout().Pages[0].Prims.OfType<TextPrim>(), t => t.Text.All(char.IsDigit) && t.X < 60);
         Assert.Empty(d.Body.Descendants<LineNumberType>());
         s.SetLineNumbers(EditorSession.LineNumMode.RestartPage);
         Assert.True(s.Undo()); Assert.True(s.Undo());

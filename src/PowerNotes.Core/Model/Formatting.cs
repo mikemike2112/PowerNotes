@@ -144,7 +144,7 @@ public sealed class StyleResolver
                 case SpacingBetweenLines sp:
                     if (Tw(sp.Before?.Value) is { } bf) p.Before = bf;
                     if (Tw(sp.After?.Value) is { } af) p.After = af;
-                    if (double.TryParse(sp.Line?.Value, out var ln)) p.Line = ln;
+                    if (double.TryParse(sp.Line?.Value, System.Globalization.CultureInfo.InvariantCulture, out var ln)) p.Line = ln;
                     if (sp.LineRule?.Value is { } lr) p.LineRule = lr == LineSpacingRuleValues.Exact ? "exact" : lr == LineSpacingRuleValues.AtLeast ? "atLeast" : "auto";
                     break;
                 case KeepNext k: p.KeepNext = k.Val?.Value ?? true; break;
